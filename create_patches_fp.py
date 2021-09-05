@@ -143,7 +143,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
             else:
                 wsi = WSI_object.getOpenSlide()
-                best_level = wsi.get_best_level_for_downsample(64)+1
+                best_level = wsi.get_best_level_for_downsample(64)
                 current_vis_params['vis_level'] = best_level
 
         if current_seg_params['seg_level'] < 0:
@@ -152,7 +152,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
             else:
                 wsi = WSI_object.getOpenSlide()
-                best_level = wsi.get_best_level_for_downsample(64)+1
+                best_level = wsi.get_best_level_for_downsample(64)
                 current_seg_params['seg_level'] = best_level
 
         keep_ids = str(current_seg_params['keep_ids'])
