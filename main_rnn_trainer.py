@@ -25,7 +25,6 @@ import logging
 parser = argparse.ArgumentParser(description='Configurations for WSI Training')
 parser.add_argument('--csv_file_path', type=str, help='dataset csv path')
 parser.add_argument('--h5_file_path', type=str, help='coords h5file path')
-parser.add_argument('--wsi_file_path', type=str, help='dataset wsi path')
 parser.add_argument('--max_epochs', type=int, default=100,
                     help='maximum number of epochs to train (default: 200)')
 parser.add_argument('--lr', type=float, default=5e-5,
@@ -153,12 +152,10 @@ if __name__ == "__main__":
         args.n_classes = 2
         dataset = Whole_Slide_Patches_Gen(args.csv_file_path,
                                           args.h5_file_path,
-                                          args.wsi_file_path,
                                           True,
                                           label_dicts=[{"MSS": 0, "MSI-H": 1}, {}, {}],
                                           patch_level=0,
                                           patch_size=512,
-                                          custom_transforms=None,
                                           )
     else:
         raise NotImplementedError

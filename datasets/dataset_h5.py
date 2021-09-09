@@ -13,24 +13,53 @@ from pandas import DataFrame
 from torch.utils.data import Dataset, DataLoader, sampler
 from torchvision import transforms, utils, models
 import torch.nn.functional as F
-import random
+import random, tqdm, staintools
 from PIL import Image
 import h5py
 
 from random import randrange
 
 
+def get_stain_normalizer(path='stainColorNormalization/template.png', method='macenko'):
+    target = staintools.read_image(path)
+    target = staintools.LuminosityStandardizer.standardize(target)
+    normalizer = staintools.StainNormalizer(method=method)
+    normalizer.fit(target)
+    return normalizer
+
+
+normalizer = get_stain_normalizer()
+
+
+def apply_stain_norm(tile, normalizer):
+    to_transform = np.array(tile).astype('uint8')
+    to_transform = staintools.LuminosityStandardizer.standardize(to_transform)
+    transformed = normalizer.transform(to_transform)
+    transformed = Image.fromarray(transformed)
+    return transformed
+
+
 def patches_gen_transforms(training=False):
-    trnsfrms_val = transforms.Compose(
-        [
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    if training:
+        trnsfrms_val = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.RandomCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
-        ]
-    )
+            ]
+        )
+    else:
+        trnsfrms_val = transforms.Compose(
+            [
+                transforms.Resize(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+            ]
+        )
     return trnsfrms_val
 
 
@@ -167,13 +196,9 @@ class Whole_Slide_Bag_FP(Dataset):
         print('transformations: ', self.roi_transforms)
 
     def __getitem__(self, idx):
-        if self.normalization:
-            from stainColorNormalization.predict import prediction
         with h5py.File(self.file_path, 'r') as hdf5_file:
             coord = hdf5_file['coords'][idx]
         img = self.wsi.read_region(coord, self.patch_level, (self.patch_size, self.patch_size)).convert('RGB')
-        if self.normalization:
-            img, = prediction([img])
         if self.target_patch_size is not None:
             img = img.resize(self.target_patch_size)
         img = self.roi_transforms(img).unsqueeze(0)
@@ -195,12 +220,10 @@ class Dataset_All_Bags(Dataset):
 class Whole_Slide_Patches_Gen(Dataset):
     def __init__(self, csv_file_path,
                  h5_file_path,
-                 wsi_file_path,
                  training,
                  label_dicts=[{}, {}, {}],
                  patch_level=0,
                  patch_size=512,
-                 custom_transforms=None,
                  ):
         slide_data = pd.read_csv(csv_file_path)
         self.label_dicts = label_dicts
@@ -211,21 +234,19 @@ class Whole_Slide_Patches_Gen(Dataset):
         slide_data_dict = slide_data[['case_id', 'label']].set_index('case_id')['label'].to_dict()
         self.slides = slide_data['slide_id'].tolist()
         self.cases = slide_data['case_id'].tolist()
+        self.paths = slide_data['path'].tolist()
         self.h5_file_path = h5_file_path
-        self.wsi_file_path = wsi_file_path
         self.training = training
-        if not custom_transforms:
-            self.roi_transforms = patches_gen_transforms()
-        else:
-            self.roi_transforms = custom_transforms
+        self.roi_transforms = patches_gen_transforms()
         self.wsi_list = []
         self.data_list = []
-        for slide_id, case_id in zip(self.slides, self.cases):
+        for slide_id, case_id, path in tqdm.tqdm(zip(self.slides, self.cases, self.paths)):
             with h5py.File(os.path.join(self.h5_file_path, '.'.join(case_id.split('.')[:-1]) + '.h5'), "r") as f:
                 dset = f['coords'][()].tolist()
                 for coord in dset:
                     self.wsi_list.append(case_id)
-                    self.data_list.append([case_id, coord[0], coord[1], slide_data_dict[case_id], slide_id])
+                    self.data_list.append(
+                        [case_id, coord[0], coord[1], slide_data_dict[case_id], slide_id, path + '/' + case_id])
         self.length = len(self.data_list)
         # self.summary()
 
@@ -249,14 +270,14 @@ class Whole_Slide_Patches_Gen(Dataset):
         return self.length
 
     def __getitem__(self, idx):
-        path = os.path.join(self.wsi_file_path, self.data_list[idx][0])
         try:
-            with openslide.OpenSlide(path) as slide:
+            with openslide.OpenSlide(self.data_list[idx][5]) as slide:
                 img = slide.read_region((self.data_list[idx][1], self.data_list[idx][2]), self.patch_level,
                                         (self.patch_size, self.patch_size)).convert('RGB')
-        except:
-            print(path + ' is error!!!!!!!!!!!!!!!!')
-        img = self.roi_transforms(img)  # .unsqueeze(0)
+                img = apply_stain_norm(img, normalizer)
+                img = self.roi_transforms(img)
+        except Exception as e:
+            print(self.data_list[idx][5])
         return img, self.data_list[idx][3]
 
     def return_splits(self, csv_path, max_nums):
@@ -269,11 +290,11 @@ class Whole_Slide_Patches_Gen(Dataset):
         train_df = dataframe[dataframe[4].isin(train_patient)]
         val_df = dataframe[dataframe[4].isin(val_patient)]
         test_df = dataframe[dataframe[4].isin(test_patient)]
-        train_split = Whole_Slide_Patches_Split(train_df, max_nums[0], self.wsi_file_path, self.training, self.patch_level,
+        train_split = Whole_Slide_Patches_Split(train_df, max_nums[0], self.training, self.patch_level,
                                                 self.patch_size)
-        val_split = Whole_Slide_Patches_Split(val_df, max_nums[1], self.wsi_file_path, self.training, self.patch_level,
+        val_split = Whole_Slide_Patches_Split(val_df, max_nums[1], self.training, self.patch_level,
                                               self.patch_size)
-        test_split = Whole_Slide_Patches_Split(test_df, max_nums[2], self.wsi_file_path, self.training, self.patch_level,
+        test_split = Whole_Slide_Patches_Split(test_df, max_nums[2], self.training, self.patch_level,
                                                self.patch_size)
 
         return train_split, val_split, test_split
@@ -282,7 +303,6 @@ class Whole_Slide_Patches_Gen(Dataset):
 class Whole_Slide_Patches_Split(Whole_Slide_Patches_Gen):
     def __init__(self, df,
                  max_num,
-                 wsi_file_path,
                  training,
                  patch_level=0,
                  patch_size=512,
@@ -297,7 +317,6 @@ class Whole_Slide_Patches_Split(Whole_Slide_Patches_Gen):
         self.num_classes = df[3].nunique()
         self.patch_level = patch_level
         self.patch_size = patch_size
-        self.wsi_file_path = wsi_file_path
         self.training = training
         if not custom_transforms:
             self.roi_transforms = patches_gen_transforms()
@@ -309,15 +328,13 @@ class Whole_Slide_Patches_Split(Whole_Slide_Patches_Gen):
 
 
 if __name__ == '__main__':
-    dataset = Whole_Slide_Patches_Gen('../dataset_csv/dataset_2021.08.22.csv',
-                                      'C:/RESULTS_TUMOR_STAIN_NORM/patches',
-                                      'D:/emmm',
+    dataset = Whole_Slide_Patches_Gen(r'C:\Code\WiseMSI\dataset_csv\dataset_train_test2_test3_msi_95tumor.csv',
+                                      r'C:\RESULTS_TUMOR_STAIN_NORM_95\patches',
                                       training=True,
                                       label_dicts=[{'MSS': 0, 'MSI-H': 1}],
-                                      custom_transforms=None,
                                       )
     train_dataset, val_dataset, test_dataset = dataset.return_splits(
-        r'C:\Code\CLAM\splits\msi_classifier_100\splits_0.csv', [500, 500, float('INF')])
+        r'C:\Code\WiseMSI\splits\msi_classifier_100\splits_0.csv', [100, 100, float('INF')])
     dl = DataLoader(train_dataset, batch_size=33, shuffle=True)
     for x, y in dl:
         print('emmm')
