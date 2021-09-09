@@ -16,12 +16,13 @@ parser.add_argument('--hold_out_test', action='store_true', default=False,
                     help='fraction to hold out (default: 0)')
 parser.add_argument('--split_code', type=str, default=None)
 parser.add_argument('--task', type=str, default='msi_classifier', choices=['msi_classifier', 'tumor_classifier'])
+parser.add_argument('--dataset_csv', type=str, help='dataset_csv')
 
 args = parser.parse_args()
 
 if args.task == 'msi_classifier':
     args.n_classes = 2
-    dataset = Generic_WSI_MTL_Dataset(csv_path='dataset_csv/dataset_tcga_2021.08.22-2.csv',
+    dataset = Generic_WSI_MTL_Dataset(csv_path=args.dataset_csv,
                                       shuffle=False,
                                       seed=args.seed,
                                       print_info=True,
@@ -31,7 +32,7 @@ if args.task == 'msi_classifier':
 
 elif args.task == 'tumor_classifier':
     args.n_classes = 1
-    dataset = Generic_WSI_MTL_Dataset(csv_path='dataset_csv/dataset_tcga_2021.08.22-2.csv',
+    dataset = Generic_WSI_MTL_Dataset(csv_path=args.dataset_csv,
                                       shuffle=False,
                                       seed=args.seed,
                                       print_info=True,
@@ -90,7 +91,3 @@ if __name__ == '__main__':
             save_splits(splits, ['train', 'val', 'test'], os.path.join(split_dir, 'splits_{}.csv'.format(i)))
             save_splits(splits, ['train', 'val', 'test'], os.path.join(split_dir, 'splits_{}_bool.csv'.format(i)),
                         boolean_style=True)
-
-
-
-
