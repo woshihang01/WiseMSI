@@ -45,6 +45,7 @@ parser.add_argument('--drop_out', action='store_true', default=True, help='enabe
 parser.add_argument('--exp_code', type=str, help='experiment code for saving results')
 parser.add_argument('--weighted_sample', action='store_true', default=False, help='enable weighted sampling')
 parser.add_argument('--task', type=str, choices=['msi_classifier'])
+parser.add_argument('--dataset_csv', type=str, help='dataset_csv')
 parser.add_argument('--model_type', default=False, choices=['toad', 'toad_cosine', 'rnn'])
 args = parser.parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -153,7 +154,7 @@ if __name__ == "__main__":
     if args.task == 'msi_classifier':
         if args.model_type == 'toad' or args.model_type == 'toad_cosine':
             args.n_classes = 2
-            dataset = Generic_MIL_MTL_Dataset(csv_path='dataset_csv/dataset_2021.08.26.csv',
+            dataset = Generic_MIL_MTL_Dataset(csv_path=args.dataset_csv,
                                               data_dir=args.data_root_dir,
                                               shuffle=False,
                                               seed=args.seed,
@@ -163,7 +164,7 @@ if __name__ == "__main__":
                                               patient_strat=False)
         elif args.model_type == 'rnn':
             args.n_classes = 2
-            dataset = Generic_WSI_RNN_Dataset(csv_path='dataset_csv/dataset_2021.08.26.csv',
+            dataset = Generic_WSI_RNN_Dataset(csv_path=args.dataset_csv,
                                               data_dir=args.data_root_dir, n=100,
                                               print_info=True,
                                               label_dicts=[{'MSS': 0, 'MSI-H': 1}],
