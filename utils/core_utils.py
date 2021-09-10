@@ -8,7 +8,7 @@ from models.model_cnn import build_model
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.metrics import auc as calc_auc
-
+import torch.nn.functional as F
 
 class Accuracy_Logger(object):
     """Accuracy logger"""
@@ -200,10 +200,9 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer=None, loss_fn=
         loss_value = loss.item()
 
         train_loss += loss_value
-        if (batch_idx + 1) % 20 == 0:
-            localtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            logging.info('time {}, batch {}, loss: {:.4f}, acc: {:.4f}'.format(localtime, batch_idx, loss_value,
-                                                                               acc_num / data.size(0)))
+        localtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        logging.info('time {}, batch {}, loss: {:.4f}, acc: {:.4f}'.format(localtime, batch_idx, loss_value,
+                                                                           acc_num / data.size(0)))
 
         error = calculate_error(Y_hat, label)
         train_error += error

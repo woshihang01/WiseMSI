@@ -237,7 +237,7 @@ class Whole_Slide_Patches_Gen(Dataset):
         self.paths = slide_data['path'].tolist()
         self.h5_file_path = h5_file_path
         self.training = training
-        self.roi_transforms = patches_gen_transforms()
+        self.roi_transforms = patches_gen_transforms(self.training)
         self.wsi_list = []
         self.data_list = []
         for slide_id, case_id, path in tqdm.tqdm(zip(self.slides, self.cases, self.paths)):
@@ -292,9 +292,9 @@ class Whole_Slide_Patches_Gen(Dataset):
         test_df = dataframe[dataframe[4].isin(test_patient)]
         train_split = Whole_Slide_Patches_Split(train_df, max_nums[0], self.training, self.patch_level,
                                                 self.patch_size)
-        val_split = Whole_Slide_Patches_Split(val_df, max_nums[1], self.training, self.patch_level,
+        val_split = Whole_Slide_Patches_Split(val_df, max_nums[1], False, self.patch_level,
                                               self.patch_size)
-        test_split = Whole_Slide_Patches_Split(test_df, max_nums[2], self.training, self.patch_level,
+        test_split = Whole_Slide_Patches_Split(test_df, max_nums[2], False, self.patch_level,
                                                self.patch_size)
 
         return train_split, val_split, test_split
@@ -305,8 +305,7 @@ class Whole_Slide_Patches_Split(Whole_Slide_Patches_Gen):
                  max_num,
                  training,
                  patch_level=0,
-                 patch_size=512,
-                 custom_transforms=None,
+                 patch_size=512
                  ):
         assert type(df) == DataFrame
         if max_num != float('INF'):
@@ -318,10 +317,7 @@ class Whole_Slide_Patches_Split(Whole_Slide_Patches_Gen):
         self.patch_level = patch_level
         self.patch_size = patch_size
         self.training = training
-        if not custom_transforms:
-            self.roi_transforms = patches_gen_transforms()
-        else:
-            self.roi_transforms = custom_transforms
+        self.roi_transforms = patches_gen_transforms(self.training)
 
     def __len__(self):
         return self.length
