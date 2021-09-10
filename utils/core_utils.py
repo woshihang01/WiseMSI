@@ -137,7 +137,7 @@ def train(datasets, cur, args):
     if args.early_stopping:
         # 连续patience轮次损失值不再下降且总轮次超过stop_epoch时就会终止
         early_stopping = EarlyStopping(patience=2, stop_epoch=5, verbose=True)
-        # early_stopping.early_stop = True
+        early_stopping.early_stop = True
     else:
         early_stopping = None
     print('Done!')

@@ -91,7 +91,7 @@ def main(args):
     for i in folds:
         seed_torch(args.seed)
         train_dataset, val_dataset, test_dataset = dataset.return_splits(csv_path='{}/splits_{}.csv'.format(
-            args.split_dir, i), max_nums=(100, 100, 200))
+            args.split_dir, i), max_nums=(50, 50, 100))
 
         print(
             'training: {}, validation: {}, testing: {}'.format(len(train_dataset), len(val_dataset), len(test_dataset)))
