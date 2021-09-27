@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import pickle
-import logging
+import logging, time
 from utils.utils import *
 import os
 from datasets.dataset_mtl_concat import save_splits
@@ -34,6 +34,14 @@ class Accuracy_Logger(object):
     def log_batch(self, count, correct, c):
         self.data[c]["count"] += count
         self.data[c]["correct"] += correct
+
+    def log_batch_rnn(self,Y_hat, Y):
+        Y_hat = np.array(Y_hat).astype(int)
+        Y = np.array(Y).astype(int)
+        for label_class in np.unique(Y):
+            cls_mask = Y == label_class
+            self.data[label_class]["count"] += cls_mask.sum()
+            self.data[label_class]["correct"] += (Y_hat[cls_mask] == Y[cls_mask]).sum()
 
     def get_summary(self, c):
         count = self.data[c]["count"]
@@ -246,50 +254,51 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer=None, loss_fn=
 
 
 def train_loop_rnn(epoch, model, loader, optimizer, n_classes, writer=None, loss_fn=None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.train()
-    cls_logger = Accuracy_Logger(n_classes=n_classes)
-    cls_train_error = 0.
-    cls_train_loss = 0.
-    for batch_idx, (feature, label_batch, feature_len) in enumerate(loader):
-        order_idx = np.argsort(feature_len.numpy())[::-1]
-        label_batch = label_batch[order_idx.tolist()].long()
+    logger = Accuracy_Logger(n_classes=n_classes)
+    train_error = 0.
+    train_loss = 0.
+    for batch_idx, (feature, label_batch) in enumerate(loader):
+        # order_idx = np.argsort(feature_len.numpy())[::-1]
+        # label_batch = label_batch[order_idx.tolist()].long()
 
-        results_dict = model(feature, feature_len)
+        results_dict = model(feature)
         logits_batch, Y_prob_batch, Y_hat_batch = results_dict['logits'], results_dict['Y_prob'], results_dict['Y_hat']
 
-        cls_loss = loss_fn(logits_batch, label_batch)
-        cls_loss_value = cls_loss.item()
+        Y_hat_batch = Y_hat_batch.squeeze(-1)
+        logger.log_batch_rnn(Y_hat_batch.cpu(), label_batch.cpu())
+        acc_num = torch.eq(Y_hat_batch, label_batch).sum().float().item()
+        loss = loss_fn(logits_batch, label_batch.to(torch.long))
+        loss_value = loss.item()
 
-        cls_train_loss += cls_loss_value
-        # if (batch_idx + 1) % 50 == 0:
-        logging.info('batch {}, cls loss: {:.4f}'.format(batch_idx, cls_loss_value))
-        for Y_prob, Y_hat, label in zip(Y_prob_batch, Y_hat_batch, label_batch):
-            cls_logger.log(Y_hat, label)
-            cls_error = calculate_error(Y_hat, label)
-            cls_train_error += cls_error
+        train_loss += loss_value
+        localtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        logging.info('time {}, batch {}, loss: {:.4f}, acc: {:.4f}'.format(localtime, batch_idx, loss_value,
+                                                                           acc_num / feature.shape[0]))
+        error = calculate_error(Y_hat_batch, label_batch)
+        train_error += error
 
         # backward pass
-        cls_loss.backward()
+        loss.backward()
         # step
         optimizer.step()
         optimizer.zero_grad()
 
     # calculate loss and error for epoch
-    cls_train_loss /= len(loader)
-    cls_train_error /= len(loader)
+    train_loss /= len(loader)
+    train_error /= len(loader)
 
     logging.info(
-        'Epoch: {}, cls train_loss: {:.4f}, cls train_error: {:.4f}'.format(epoch, cls_train_loss, cls_train_error))
+        'Epoch: {}, cls train_loss: {:.4f}, cls train_error: {:.4f}'.format(epoch, train_loss, train_error))
     for i in range(n_classes):
-        acc, correct, count = cls_logger.get_summary(i)
+        acc, correct, count = logger.get_summary(i)
         logging.info('class {}: tpr {:.4f}, correct {}/{}'.format(i, acc, correct, count))
         if writer:
             writer.add_scalar('train/class_{}_tpr'.format(i), acc, epoch)
 
     if writer:
-        writer.add_scalar('train/cls_loss', cls_train_loss, epoch)
-        writer.add_scalar('train/cls_error', cls_train_error, epoch)
+        writer.add_scalar('train/cls_loss', train_loss, epoch)
+        writer.add_scalar('train/cls_error', train_error, epoch)
 
 
 def validate(cur, epoch, model, loader, n_classes, early_stopping=None, writer=None, loss_fn=None, results_dir=None):
@@ -368,70 +377,69 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping=None, writer=N
 
 
 def validate_rnn(cur, epoch, model, loader, n_classes, early_stopping=None, writer=None, loss_fn=None, results_dir=None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
-    cls_logger = Accuracy_Logger(n_classes=n_classes)
-    cls_val_error = 0.
-    cls_val_loss = 0.
+    logger = Accuracy_Logger(n_classes=n_classes)
+    val_error = 0.
+    val_loss = 0.
 
-    cls_probs = np.zeros((len(loader), n_classes))
-    cls_labels = np.zeros(len(loader))
+    probs = np.zeros((len(loader.dataset), n_classes))
+    labels = np.zeros(len(loader.dataset))
 
     with torch.no_grad():
-        for batch_idx, (feature, label_batch, feature_len) in enumerate(loader):
-            order_idx = np.argsort(feature_len.numpy())[::-1]
-            label_batch = label_batch[order_idx.tolist()].to(device)
-
-            results_dict = model(feature, feature_len)
+        for batch_idx, (feature, label_batch) in enumerate(loader):
+            results_dict = model(feature)
             logits_batch, Y_prob_batch, Y_hat_batch = results_dict['logits'], results_dict['Y_prob'], results_dict['Y_hat']
 
-            cls_loss = loss_fn(logits_batch, label_batch)
-            cls_loss_value = cls_loss.item()
-            cls_val_loss += cls_loss_value
-            for Y_prob, Y_hat, label in zip(Y_prob_batch, Y_hat_batch, label_batch):
-                cls_logger.log(Y_hat, label)
-                cls_probs[batch_idx] = Y_prob.cpu().numpy()
-                cls_labels[batch_idx] = label.item()
-                cls_error = calculate_error(Y_hat, label)
-                cls_val_error += cls_error
+            Y_hat_batch = Y_hat_batch.squeeze(-1)
+            logger.log_batch_rnn(Y_hat_batch.cpu(), label_batch.cpu())
+            acc_num = torch.eq(Y_hat_batch, label_batch).sum().float().item()
+            loss = loss_fn(logits_batch, label_batch.to(torch.long))
+            loss_value = loss.item()
 
+            val_loss += loss_value
+            # localtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            # logging.info('time {}, batch {}, loss: {:.4f}, acc: {:.4f}'.format(localtime, batch_idx, loss_value,
+            #                                                                    acc_num / feature.shape[0]))
+            error = calculate_error(Y_hat_batch, label_batch)
+            val_error += error
+            probs[batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = Y_prob_batch.cpu().numpy()
+            labels[
+            batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = label_batch.cpu().numpy()
 
-
-    cls_val_error /= len(loader)
-    cls_val_loss /= len(loader)
+    val_error /= len(loader)
+    val_loss /= len(loader)
 
     if n_classes == 2:
-        cls_auc = roc_auc_score(cls_labels, cls_probs[:, 1])
-        cls_aucs = []
+        auc = roc_auc_score(labels, probs[:, 1])
     else:
         cls_aucs = []
-        binary_labels = label_binarize(cls_labels, classes=[i for i in range(n_classes)])
+        binary_labels = label_binarize(labels, classes=[i for i in range(n_classes)])
         for class_idx in range(n_classes):
-            if class_idx in cls_labels:
-                fpr, tpr, _ = roc_curve(binary_labels[:, class_idx], cls_probs[:, class_idx])
+            if class_idx in labels:
+                fpr, tpr, _ = roc_curve(binary_labels[:, class_idx], probs[:, class_idx])
                 cls_aucs.append(calc_auc(fpr, tpr))
             else:
                 cls_aucs.append(float('nan'))
 
-        cls_auc = np.nanmean(np.array(cls_aucs))
+        auc = np.nanmean(np.array(cls_aucs))
 
     if writer:
-        writer.add_scalar('val/cls_loss', cls_val_loss, epoch)
-        writer.add_scalar('val/cls_auc', cls_auc, epoch)
-        writer.add_scalar('val/cls_error', cls_val_error, epoch)
+        writer.add_scalar('val/cls_loss', val_loss, epoch)
+        writer.add_scalar('val/cls_auc', auc, epoch)
+        writer.add_scalar('val/cls_error', val_error, epoch)
 
     logging.info(
-        '\nVal Set, cls val_loss: {:.4f}, cls val_error: {:.4f}, cls auc: {:.4f}'.format(cls_val_loss, cls_val_error,
-                                                                                         cls_auc))
+        '\nVal Set, cls val_loss: {:.4f}, cls val_error: {:.4f}, cls auc: {:.4f}'.format(val_loss, val_error,
+                                                                                         auc))
     for i in range(n_classes):
-        acc, correct, count = cls_logger.get_summary(i)
-        logging.info('class {}: tpr {}, correct {}/{}'.format(i, acc, correct, count))
+        acc, correct, count = logger.get_summary(i)
+        logging.info('class {}: tpr {:.4f}, correct {}/{}'.format(i, acc, correct, count))
         if writer:
             writer.add_scalar('val/class_{}_tpr'.format(i), acc, epoch)
 
     if early_stopping:
         assert results_dir
-        early_stopping(epoch, cls_val_loss, model,
+        early_stopping(epoch, val_loss, model,
                        ckpt_name=os.path.join(results_dir, "s_{}_checkpoint.pt".format(cur)))
 
         if early_stopping.early_stop:

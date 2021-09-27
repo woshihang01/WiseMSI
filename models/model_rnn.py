@@ -5,6 +5,8 @@ from torchvision import transforms, datasets
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import numpy as np
 import torch.nn.functional as F
+
+
 # # 首先建立一个简单的循环神经网络：输入维度为1024， 输出维度是512， 一层的双向网络
 # basic_rnn = nn.RNN(input_size=1024, hidden_size=512, num_layers=2, bidirectional=False)
 # """
@@ -35,32 +37,44 @@ import torch.nn.functional as F
 
 
 class rnn_classify(nn.Module):
-    def __init__(self, in_feature=1024, hidden_feature=256, num_layers=2, num_class=2):
+    def __init__(self, input_size=1024, hidden_layer_size=256, num_class=2):
         super(rnn_classify, self).__init__()
-        self.rnn = nn.LSTM(input_size=in_feature, hidden_size=hidden_feature, num_layers=num_layers, batch_first=True)
-        self.dense_1 = nn.Linear(hidden_feature, hidden_feature // 4)
-        self.activate = nn.ReLU()
-        self.dense_2 = nn.Linear(hidden_feature // 4, num_class)
+        self.hidden_layer_size = hidden_layer_size
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_layer_size, batch_first=True)
+        self.module = [
+            nn.Linear(hidden_layer_size, hidden_layer_size//4),
+            nn.ReLU(),
+            nn.Linear(hidden_layer_size//4, num_class),
+        ]
+        self.module = nn.Sequential(*self.module)
 
-    def forward(self, feature, feature_len):
-        order_idx = np.argsort(feature_len.numpy())[::-1]
-        order_feature = feature[order_idx.tolist()]
-        order_seq = feature_len[order_idx.tolist()]
-        pack_data = pack_padded_sequence(order_feature, order_seq, batch_first=True)
-        out, _ = self.rnn(pack_data.float())
-        unpacked = pad_packed_sequence(out)
-        out, bz = unpacked[0], unpacked[1]
-        out = out[bz-1, list(range(out.shape[1])), :]
-        out = self.dense_1(out)
-        out = self.activate(out)
-        logits = self.dense_2(out)
+    def forward(self, input_seq):
+        lstm_out, self.hidden_cell = self.lstm(input_seq.to(torch.float32))
+        logits = self.module(lstm_out[:, -1, :])
         Y_hat = torch.topk(logits, 1, dim=1)[1]
         Y_prob = F.softmax(logits, dim=1)
         results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
         return results_dict
 
+    # def forward(self, feature, feature_len):
+    #     order_idx = np.argsort(feature_len.numpy())[::-1]
+    #     order_feature = feature[order_idx.tolist()]
+    #     order_seq = feature_len[order_idx.tolist()]
+    #     pack_data = pack_padded_sequence(order_feature, order_seq, batch_first=True)
+    #     out, _ = self.rnn(pack_data.float())
+    #     unpacked = pad_packed_sequence(out)
+    #     out, bz = unpacked[0], unpacked[1]
+    #     out = out[bz-1, list(range(out.shape[1])), :]
+    #     out = self.dense_1(out)
+    #     out = self.activate(out)
+    #     logits = self.dense_2(out)
+    #     Y_hat = torch.topk(logits, 1, dim=1)[1]
+    #     Y_prob = F.softmax(logits, dim=1)
+    #     results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
+    #     return results_dict
+
 #
-# net = rnn_classify(in_feature=28, hidden_feature=100, num_layers=2, num_class=10)
+# net = rnn_classify(28, 100, 10)
 # loss_fn = nn.CrossEntropyLoss()
 # optimizer = torch.optim.Adadelta(net.parameters(), 1e-1)
 #

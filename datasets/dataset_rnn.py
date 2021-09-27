@@ -48,10 +48,10 @@ class Generic_WSI_RNN_Dataset(Dataset):
         full_path = os.path.join(self.data_dir, os.path.splitext(self.patient_data['case_id'][idx])[0] + '.h5')
         with h5py.File(full_path, 'r') as hdf5_file:
             feature = hdf5_file['features'][:]
-            feature_len = self.n if feature.shape[0] >= self.n else feature.shape[0]
+            # feature_len = self.n if feature.shape[0] >= self.n else feature.shape[0]
             feature = self.rand_row(feature, self.n)
 
-        return feature, self.patient_data['label'][idx], feature_len
+        return feature, self.patient_data['label'][idx]#, feature_len
 
     def cls_ids_prep(self):
         # store ids corresponding each class at the patient or case level
