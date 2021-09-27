@@ -133,8 +133,10 @@ def train(datasets, cur, args):
         model.relocate()
         print('Done!')
     elif model_dict['model_type'] == 'rnn':
-        model = rnn_classify()
+        model = rnn_classify().to(device)
         print('Done!')
+    else:
+        raise Exception('model is error')
     # print_network(model)
 
     print('\nInit optimizer ...', end=' ')
