@@ -146,7 +146,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_classes', default=2)
     parser.add_argument('--results_dir', default='./results', help='results directory (default: ./results)')
     parser.add_argument('--drop_out', action='store_true', default=True, help='enabel dropout (p=0.25)')
-    parser.add_argument('--model_type', default='rnn', choices=['toad', 'toad_cosine', 'rnn'])
+    parser.add_argument('--model_type', default='toad', choices=['toad', 'toad_cosine', 'rnn'])
     parser.add_argument('--pt_files_dir', default='D:/RESULTS_TUMOR_STAIN_NORM_95/patches', type=str,
                         help='h5file directory')
     parser.add_argument('--patches_dir', default='D:/RESULTS_TUMOR_STAIN_NORM_95/patches', type=str,
@@ -154,9 +154,9 @@ if __name__ == '__main__':
     parser.add_argument('--task', type=str, choices=['msi_classifier'], default='msi_classifier')
     parser.add_argument('--seed', type=int, default=1,
                         help='random seed for reproducible experiment (default: 1)')
-    parser.add_argument('--k', type=int, default=1)
+    parser.add_argument('--k', type=int, default=10)
     parser.add_argument('--exp_code', type=str, help='experiment code for saving results',
-                        default='msi_classifier_2021_09_26_rnn_95tumor')
+                        default='msi_classifier_2021_09_09_toad_95tumor')
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     csv_path = 'dataset_csv/dataset_train_test2_test3_msi_95tumor.csv'
