@@ -22,7 +22,7 @@ import numpy as np
 import logging
 
 
-def set_log(logfileName='./tumorDetector.log', level=logging.INFO):
+def set_log(logfileName='./logs/tumorDetector.log', level=logging.INFO):
     logging.basicConfig(
         level=level,
         format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',

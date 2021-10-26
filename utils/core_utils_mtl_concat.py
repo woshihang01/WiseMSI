@@ -35,7 +35,7 @@ class Accuracy_Logger(object):
         self.data[c]["count"] += count
         self.data[c]["correct"] += correct
 
-    def log_batch_rnn(self,Y_hat, Y):
+    def log_batch_rnn(self, Y_hat, Y):
         Y_hat = np.array(Y_hat).astype(int)
         Y = np.array(Y).astype(int)
         for label_class in np.unique(Y):
@@ -152,8 +152,9 @@ def train(datasets, cur, args):
         train_loader = DataLoader(train_split, 64, shuffle=True)
         val_loader = DataLoader(val_split, 64, shuffle=False)
         test_loader = DataLoader(test_split, 64, shuffle=False)
+    else:
+        raise Exception('model type is error')
     print('Done!')
-
     print('\nSetup EarlyStopping...', end=' ')
     if args.early_stopping:
         early_stopping = EarlyStopping(patience=40, stop_epoch=100, verbose=True)  # 连续patience轮，并且总论此超过stop_epoch轮就会终止
@@ -169,25 +170,35 @@ def train(datasets, cur, args):
 
             if stop:
                 break
+        if args.early_stopping:
+            model.load_state_dict(torch.load(os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur))))
+        else:
+            torch.save(model.state_dict(), os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur)))
+
+        _, cls_val_error, cls_val_auc, _ = summary(model, val_loader, args.n_classes)
+        logging.info('Cls Val error: {:.4f}, Cls ROC AUC: {:.4f}'.format(cls_val_error, cls_val_auc))
+
+        results_dict, cls_test_error, cls_test_auc, acc_loggers = summary(model, test_loader, args.n_classes)
+        logging.info('Cls Test error: {:.4f}, Cls ROC AUC: {:.4f}'.format(cls_test_error, cls_test_auc))
     elif model_dict['model_type'] == 'rnn':
         for epoch in range(args.max_epochs):
             train_loop_rnn(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn)
             stop = validate_rnn(cur, epoch, model, val_loader, args.n_classes,
                                 early_stopping, writer, loss_fn, args.results_dir)
-
             if stop:
                 break
-    if args.early_stopping:
-        model.load_state_dict(torch.load(os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur))))
+        if args.early_stopping:
+            model.load_state_dict(torch.load(os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur))))
+        else:
+            torch.save(model.state_dict(), os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur)))
+
+        _, cls_val_error, cls_val_auc, _ = summary_rnn(model, val_loader, args.n_classes)
+        logging.info('Cls Val error: {:.4f}, Cls ROC AUC: {:.4f}'.format(cls_val_error, cls_val_auc))
+
+        results_dict, cls_test_error, cls_test_auc, acc_loggers = summary_rnn(model, test_loader, args.n_classes)
+        logging.info('Cls Test error: {:.4f}, Cls ROC AUC: {:.4f}'.format(cls_test_error, cls_test_auc))
     else:
-        torch.save(model.state_dict(), os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur)))
-
-    _, cls_val_error, cls_val_auc, _ = summary(model, val_loader, args.n_classes)
-    logging.info('Cls Val error: {:.4f}, Cls ROC AUC: {:.4f}'.format(cls_val_error, cls_val_auc))
-
-    results_dict, cls_test_error, cls_test_auc, acc_loggers = summary(model, test_loader, args.n_classes)
-    logging.info('Cls Test error: {:.4f}, Cls ROC AUC: {:.4f}'.format(cls_test_error, cls_test_auc))
-
+        raise Exception('model type is error')
     for i in range(args.n_classes):
         acc, correct, count = acc_loggers.get_summary(i)
         logging.info('class {}: acc {:.4f}, correct {}/{}'.format(i, acc, correct, count))
@@ -261,16 +272,15 @@ def train_loop_rnn(epoch, model, loader, optimizer, n_classes, writer=None, loss
     train_error = 0.
     train_loss = 0.
     for batch_idx, (feature, label_batch) in enumerate(loader):
-        # order_idx = np.argsort(feature_len.numpy())[::-1]
-        # label_batch = label_batch[order_idx.tolist()].long()
+        feature = feature.to(device)
 
         results_dict = model(feature)
         logits_batch, Y_prob_batch, Y_hat_batch = results_dict['logits'], results_dict['Y_prob'], results_dict['Y_hat']
 
-        Y_hat_batch = Y_hat_batch.squeeze(-1)
-        logger.log_batch_rnn(Y_hat_batch.cpu(), label_batch.cpu())
+        Y_hat_batch = Y_hat_batch.squeeze(-1).cpu()
+        logger.log_batch_rnn(Y_hat_batch, label_batch)
         acc_num = torch.eq(Y_hat_batch, label_batch).sum().float().item()
-        loss = loss_fn(logits_batch, label_batch.to(torch.long))
+        loss = loss_fn(logits_batch, label_batch.to(device).to(torch.long))
         loss_value = loss.item()
 
         train_loss += loss_value
@@ -378,7 +388,8 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping=None, writer=N
     return False
 
 
-def validate_rnn(cur, epoch, model, loader, n_classes, early_stopping=None, writer=None, loss_fn=None, results_dir=None):
+def validate_rnn(cur, epoch, model, loader, n_classes, early_stopping=None, writer=None, loss_fn=None,
+                 results_dir=None):
     model.eval()
     logger = Accuracy_Logger(n_classes=n_classes)
     val_error = 0.
@@ -389,13 +400,15 @@ def validate_rnn(cur, epoch, model, loader, n_classes, early_stopping=None, writ
 
     with torch.no_grad():
         for batch_idx, (feature, label_batch) in enumerate(loader):
+            feature = feature.to(device)
             results_dict = model(feature)
-            logits_batch, Y_prob_batch, Y_hat_batch = results_dict['logits'], results_dict['Y_prob'], results_dict['Y_hat']
+            logits_batch, Y_prob_batch, Y_hat_batch = results_dict['logits'], results_dict['Y_prob'], results_dict[
+                'Y_hat']
 
-            Y_hat_batch = Y_hat_batch.squeeze(-1)
-            logger.log_batch_rnn(Y_hat_batch.cpu(), label_batch.cpu())
+            Y_hat_batch = Y_hat_batch.squeeze(-1).cpu()
+            logger.log_batch_rnn(Y_hat_batch, label_batch)
             acc_num = torch.eq(Y_hat_batch, label_batch).sum().float().item()
-            loss = loss_fn(logits_batch, label_batch.to(torch.long))
+            loss = loss_fn(logits_batch, label_batch.to(device).to(torch.long))
             loss_value = loss.item()
 
             val_loss += loss_value
@@ -404,9 +417,10 @@ def validate_rnn(cur, epoch, model, loader, n_classes, early_stopping=None, writ
             #                                                                    acc_num / feature.shape[0]))
             error = calculate_error(Y_hat_batch, label_batch)
             val_error += error
-            probs[batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = Y_prob_batch.cpu().numpy()
+            probs[
+            batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = Y_prob_batch.cpu().numpy()
             labels[
-            batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = label_batch.cpu().numpy()
+            batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = label_batch.numpy()
 
     val_error /= len(loader)
     val_loss /= len(loader)
@@ -473,7 +487,6 @@ def summary(model, loader, n_classes):
 
         logits, Y_prob, Y_hat, A = results_dict['logits'], results_dict['Y_prob'], results_dict['Y_hat'], results_dict[
             'A']
-        del results_dict
 
         cls_logger.log(Y_hat, label)
         cls_probs = Y_prob.cpu().numpy()
@@ -484,6 +497,52 @@ def summary(model, loader, n_classes):
             {slide_id: {'slide_id': np.array(slide_id), 'cls_prob': cls_probs, 'cls_label': label.item(), 'A': A}})
         cls_error = calculate_error(Y_hat, label)
         cls_test_error += cls_error
+
+    cls_test_error /= len(loader)
+
+    if n_classes == 2:
+        cls_auc = roc_auc_score(all_cls_labels, all_cls_probs[:, 1])
+
+    else:
+        cls_auc = roc_auc_score(all_cls_labels, all_cls_probs, multi_class='ovr')
+
+    return patient_results, cls_test_error, cls_auc, cls_logger
+
+
+def summary_rnn(model, loader, n_classes):
+    cls_logger = Accuracy_Logger(n_classes=n_classes)
+    model.eval()
+    cls_test_error = 0.
+    cls_test_loss = 0.
+
+    all_cls_probs = np.zeros((len(loader.dataset), n_classes))
+    all_cls_labels = np.zeros(len(loader.dataset))
+
+    patient_results = {}
+
+    with torch.no_grad():
+        for batch_idx, (feature, label_batch) in enumerate(loader):
+            feature = feature.to(device)
+            results_dict = model(feature)
+
+            logits_batch, Y_prob_batch, Y_hat_batch = results_dict['logits'], results_dict['Y_prob'], results_dict[
+                'Y_hat']
+
+            Y_hat_batch = Y_hat_batch.squeeze(-1).cpu()
+
+            cls_logger.log_batch_rnn(Y_hat_batch, label_batch)
+            cls_probs = Y_prob_batch.cpu().numpy()
+            all_cls_probs[
+            batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = cls_probs
+            all_cls_labels[
+            batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]] = label_batch.numpy()
+            slide_ids = loader.dataset.slide_data['slide_id'][
+                        batch_idx * loader.batch_size:batch_idx * loader.batch_size + feature.shape[0]]
+
+            patient_results.update(
+                {'slide_id': slide_ids, 'cls_prob': cls_probs[:, 1], 'cls_label': label_batch.numpy()})
+            cls_error = calculate_error(Y_hat_batch, label_batch)
+            cls_test_error += cls_error
 
     cls_test_error /= len(loader)
 
