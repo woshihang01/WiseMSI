@@ -143,7 +143,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
             else:
                 wsi = WSI_object.getOpenSlide()
-                best_level = wsi.get_best_level_for_downsample(64) + 1
+                best_level = wsi.get_best_level_for_downsample(64)
                 current_vis_params['vis_level'] = best_level
 
         if current_seg_params['seg_level'] < 0:
@@ -152,7 +152,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
             else:
                 wsi = WSI_object.getOpenSlide()
-                best_level = wsi.get_best_level_for_downsample(64) + 1
+                best_level = wsi.get_best_level_for_downsample(64)
                 current_seg_params['seg_level'] = best_level
 
         keep_ids = str(current_seg_params['keep_ids'])
@@ -222,29 +222,28 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
     return seg_times, patch_times
 
 
-parser = argparse.ArgumentParser(description='seg and patch')
-parser.add_argument('--source', type=str,
-                    help='path to folder containing raw wsi image files')
-parser.add_argument('--step_size', type=int, default=256,
-                    help='step_size')
-parser.add_argument('--patch_size', type=int, default=256,
-                    help='patch_size')
-parser.add_argument('--patch', default=False, action='store_true')
-parser.add_argument('--seg', default=False, action='store_true')
-parser.add_argument('--stitch', default=False, action='store_true')
-parser.add_argument('--no_auto_skip', default=True, action='store_false')
-parser.add_argument('--save_dir', type=str,
-                    help='directory to save processed data')
-parser.add_argument('--preset', default=None, type=str,
-                    help='predefined profile of default segmentation and filter parameters (.csv)')
-parser.add_argument('--patch_level', type=int, default=0,
-                    help='downsample level at which to patch')
-parser.add_argument('--process_list', type=str, default=None,
-                    help='name of list of images to process with parameters (.csv)')
-parser.add_argument('--only_tumor', default=False, action='store_true')
-parser.add_argument('--normalize', default=False, action='store_true')
-
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='seg and patch')
+    parser.add_argument('--source', type=str,
+                        help='path to folder containing raw wsi image files')
+    parser.add_argument('--step_size', type=int, default=256,
+                        help='step_size')
+    parser.add_argument('--patch_size', type=int, default=256,
+                        help='patch_size')
+    parser.add_argument('--patch', default=False, action='store_true')
+    parser.add_argument('--seg', default=False, action='store_true')
+    parser.add_argument('--stitch', default=False, action='store_true')
+    parser.add_argument('--no_auto_skip', default=True, action='store_false')
+    parser.add_argument('--save_dir', type=str,
+                        help='directory to save processed data')
+    parser.add_argument('--preset', default=None, type=str,
+                        help='predefined profile of default segmentation and filter parameters (.csv)')
+    parser.add_argument('--patch_level', type=int, default=0,
+                        help='downsample level at which to patch')
+    parser.add_argument('--process_list', type=str, default=None,
+                        help='name of list of images to process with parameters (.csv)')
+    parser.add_argument('--only_tumor', default=False, action='store_true')
+    parser.add_argument('--normalize', default=False, action='store_true')
     args = parser.parse_args()
 
     patch_save_dir = os.path.join(args.save_dir, 'patches')
@@ -275,8 +274,8 @@ if __name__ == '__main__':
 
     seg_params = {'seg_level': -1, 'sthresh': 15, 'mthresh': 1, 'close': 4, 'use_otsu': False,
                   'keep_ids': 'none', 'exclude_ids': 'none'}
-    filter_params = {'a_t': 100, 'a_h': 16, 'max_n_holes': 8}
-    vis_params = {'vis_level': -1, 'line_thickness': 250}
+    filter_params = {'a_t': 2, 'a_h': 10, 'max_n_holes': 10}
+    vis_params = {'vis_level': -1, 'line_thickness': 150}
     patch_params = {'use_padding': True, 'contour_fn': 'four_pt'}
 
     if args.preset:

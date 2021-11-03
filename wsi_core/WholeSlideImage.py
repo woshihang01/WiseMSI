@@ -194,6 +194,11 @@ class WholeSlideImage(object):
             _, img_otsu = cv2.threshold(img_med, 0, sthresh_up, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
         else:
             _, img_otsu = cv2.threshold(img_med, sthresh, sthresh_up, cv2.THRESH_BINARY)
+        lower_red = np.array([0, 0, 0])
+        upper_red = np.array([180, 255, 85])
+        mask = cv2.inRange(img_hsv, lower_red, upper_red)
+        mask[mask == 255] = 1
+        img_otsu = img_otsu + mask
 
         # Morphological closing
         if close > 0:
@@ -557,9 +562,17 @@ class WholeSlideImage(object):
         y_range = np.arange(start_y, stop_y, step=step_size_y)
         x_coords, y_coords = np.meshgrid(x_range, y_range, indexing='ij')
         coord_candidates = np.array([x_coords.flatten(), y_coords.flatten()]).transpose()
-        results = []
-        for coord in coord_candidates:
-            results.append(self.process_coord_candidate(coord, contour_holes, ref_patch_size[0], cont_check_fn))
+
+        num_workers = mp.cpu_count()
+        if num_workers > 10:
+            num_workers = 10
+        pool = mp.Pool(num_workers)
+
+        iterable = [(coord, contour_holes, ref_patch_size[0], cont_check_fn) for coord in coord_candidates]
+        results = pool.starmap(WholeSlideImage.process_coord_candidate, iterable)
+        pool.close()
+        # for coord in coord_candidates:
+        #     results.append(self.process_coord_candidate(coord, contour_holes, ref_patch_size[0], cont_check_fn))
 
         results = np.array([result for result in results if result is not None])
 
