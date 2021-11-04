@@ -7,6 +7,8 @@ import math
 from itertools import islice
 import collections
 import logging
+import staintools
+from PIL import Image
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -23,6 +25,22 @@ def set_log(logfileName, level=logging.INFO):
         '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
+
+
+def get_stain_normalizer(path='stainColorNormalization/template.png', method='macenko'):
+    target = staintools.read_image(path)
+    target = staintools.LuminosityStandardizer.standardize(target)
+    normalizer = staintools.StainNormalizer(method=method)
+    normalizer.fit(target)
+    return normalizer
+
+
+def apply_stain_norm(tile, normalizer):
+    to_transform = np.array(tile).astype('uint8')
+    to_transform = staintools.LuminosityStandardizer.standardize(to_transform)
+    transformed = normalizer.transform(to_transform)
+    transformed = Image.fromarray(transformed)
+    return transformed
 
 
 class SubsetSequentialSampler(Sampler):

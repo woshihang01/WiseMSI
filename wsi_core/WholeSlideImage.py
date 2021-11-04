@@ -1,7 +1,5 @@
-import math
 import os
 import time
-import xml.etree.ElementTree as ET
 import torch.nn.functional as F
 from xml.dom import minidom
 import multiprocessing as mp
@@ -9,10 +7,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import openslide
-import torchvision.models
 from PIL import Image
-import pdb
-import h5py, staintools
 import math
 from models.resnet_custom import resnet50_baseline
 from models.model_cnn import build_model
@@ -22,6 +17,7 @@ import torch, torchvision
 from wsi_core.util_classes import isInContourV1, isInContourV2, isInContourV3_Easy, isInContourV3_Hard, \
     Contour_Checking_fn
 from utils.file_utils import load_pkl, save_pkl
+from utils.utils import apply_stain_norm, get_stain_normalizer
 from tqdm import tqdm
 
 Image.MAX_IMAGE_PIXELS = 933120000
@@ -52,7 +48,7 @@ class WholeSlideImage(object):
         self.contours_tissue = None
         self.contours_tumor = None
         self.hdf5_file = None
-        self.normalizer = self.get_stain_normalizer()
+        self.normalizer = get_stain_normalizer()
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -66,20 +62,6 @@ class WholeSlideImage(object):
         self.extract_feature_model = resnet50_baseline(pretrained=True)
         self.extract_feature_model = self.extract_feature_model.to(self.device)
         print('Done')
-
-    def get_stain_normalizer(self, path='stainColorNormalization/template.png', method='macenko'):
-        target = staintools.read_image(path)
-        target = staintools.LuminosityStandardizer.standardize(target)
-        normalizer = staintools.StainNormalizer(method=method)
-        normalizer.fit(target)
-        return normalizer
-
-    def apply_stain_norm(self, tile, normalizer):
-        to_transform = np.array(tile).astype('uint8')
-        to_transform = staintools.LuminosityStandardizer.standardize(to_transform)
-        transformed = normalizer.transform(to_transform)
-        transformed = Image.fromarray(transformed)
-        return transformed
 
     def getOpenSlide(self):
         return self.wsi
@@ -478,7 +460,7 @@ class WholeSlideImage(object):
                     (256, 256), resample=0)
                 if normalize:
                     try:
-                        img = self.apply_stain_norm(img, self.normalizer)
+                        img = apply_stain_norm(img, self.normalizer)
                     except Exception:
                         continue
                 per_batch_img.append(img)

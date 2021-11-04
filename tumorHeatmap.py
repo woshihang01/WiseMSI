@@ -12,9 +12,8 @@ from torchvision import transforms, models
 from torch import nn
 import matplotlib.pyplot as plt
 import math
-import staintools
 from tqdm import tqdm
-from utils.utils import set_log
+from utils.utils import set_log, get_stain_normalizer, apply_stain_norm
 import logging
 
 image_transform = transforms.Compose([
@@ -27,23 +26,6 @@ image_transform = transforms.Compose([
 ])
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def get_stain_normalizer(path='stainColorNormalization/template.png', method='macenko'):
-    target = staintools.read_image(path)
-    target = staintools.LuminosityStandardizer.standardize(target)
-    normalizer = staintools.StainNormalizer(method=method)
-    normalizer.fit(target)
-    return normalizer
-
-
-def apply_stain_norm(tile, normalizer):
-    to_transform = np.array(tile).astype('uint8')
-    to_transform = staintools.LuminosityStandardizer.standardize(to_transform)
-    transformed = normalizer.transform(to_transform)
-    transformed = Image.fromarray(transformed)
-    return transformed
-
 
 normalizer = get_stain_normalizer()
 
