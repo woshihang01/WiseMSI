@@ -11,24 +11,7 @@ from datasets.dataset_mtl_concat import Generic_MIL_MTL_Dataset
 from datasets.dataset_rnn import Generic_WSI_RNN_Dataset
 import logging
 from utils.core_utils_mtl_concat import Accuracy_Logger
-
-
-def set_log(logfileName='./logs/wsi_test.log', level=logging.INFO):
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-        filename=logfileName,
-        filemode='a'
-    )
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
-
-
-set_log()
-
+from utils.utils import set_log
 
 def validate(model, loader, n_classes, loss_fn=None):
     model.eval()
@@ -142,6 +125,7 @@ def calculate_error(Y_hat, Y):
 
 
 if __name__ == '__main__':
+    set_log('./logs/wsi_test.log')
     parser = argparse.ArgumentParser(description='Configurations for WSI Training')
     parser.add_argument('--n_classes', default=2)
     parser.add_argument('--results_dir', default='./results', help='results directory (default: ./results)')

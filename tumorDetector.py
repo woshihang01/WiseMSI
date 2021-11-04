@@ -22,23 +22,6 @@ import numpy as np
 import logging
 
 
-def set_log(logfileName='./logs/tumorDetector.log', level=logging.INFO):
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-        filename=logfileName,
-        filemode='a'
-    )
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
-
-
-set_log()
-
-
 def main(args):
     # create results directory if necessary
     if not os.path.isdir(args.results_dir):
@@ -181,6 +164,7 @@ for key, val in settings.items():
     print("{}:  {}".format(key, val))
 
 if __name__ == "__main__":
+    set_log('./logs/tumorDetector.log')
     results = main(args)
     logging.info("finished!")
     logging.info("end script")

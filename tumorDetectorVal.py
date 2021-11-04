@@ -5,23 +5,9 @@ from torch.utils.data import DataLoader
 from torch import nn
 from datasets.dataset_cnn import WSI_Patches_Image
 import logging
+from utils.utils import set_log
 
-
-def set_log(logfileName='./tumorDetectorVal.log', level=logging.INFO):
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-        filename=logfileName,
-        filemode='a'
-    )
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
-
-
-set_log()
+set_log('./tumorDetectorVal.log')
 parser = argparse.ArgumentParser(description='Configurations for WSI Training')
 parser.add_argument('--patch_image_path', default='C:/test2_patch_staintools', type=str, help='dataset wsi path')
 parser.add_argument('--n_classes', type=int, default=2)

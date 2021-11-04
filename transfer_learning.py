@@ -9,31 +9,13 @@ from torch import nn
 import numpy as np
 import logging, os, argparse
 from datasets.dataset_mtl_concat import save_splits
-from utils.utils import get_split_loader
+from utils.utils import get_split_loader, set_log
 from models.model_toad import TOAD_fc_mtl_concat
 from utils.utils import get_optim
 from utils.core_utils_mtl_concat import EarlyStopping, train_loop, validate, summary
 from datasets.dataset_mtl_concat import Generic_MIL_MTL_Dataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def set_log(logfileName='./transfer_learning.log', level=logging.INFO):
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-        filename=logfileName,
-        filemode='a'
-    )
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
-
-
-set_log()
-
 
 def train(datasets, cur, args):
     """
@@ -125,6 +107,7 @@ def train(datasets, cur, args):
 
 
 if __name__ == '__main__':
+    set_log('./transfer_learning.log')
     parser = argparse.ArgumentParser(description='Configurations for WSI Training')
     parser.add_argument('--n_classes', default=2)
     parser.add_argument('--results_dir', default='./results', help='results directory (default: ./results)')

@@ -1,5 +1,4 @@
 import argparse
-import logging
 import os
 import numpy as np
 import openslide
@@ -15,6 +14,8 @@ import matplotlib.pyplot as plt
 import math
 import staintools
 from tqdm import tqdm
+from utils.utils import set_log
+import logging
 
 image_transform = transforms.Compose([
     transforms.Resize(256),
@@ -45,20 +46,6 @@ def apply_stain_norm(tile, normalizer):
 
 
 normalizer = get_stain_normalizer()
-
-
-def set_log(logfileName='./logs/tumorHeatmap.log', level=logging.INFO):
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-        filename=logfileName,
-        filemode='a')
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
 
 
 def tissue_masker(slide, power):
@@ -266,5 +253,5 @@ def hanshu(a, bianchang):
 
 
 if __name__ == '__main__':
-    set_log()
+    set_log('./logs/tumorHeatmap.log')
     main()

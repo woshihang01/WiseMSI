@@ -6,8 +6,23 @@ import numpy as np
 import math
 from itertools import islice
 import collections
+import logging
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def set_log(logfileName, level=logging.INFO):
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+        filename=logfileName,
+        filemode='a')
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
 
 
 class SubsetSequentialSampler(Sampler):

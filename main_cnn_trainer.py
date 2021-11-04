@@ -53,21 +53,6 @@ parser.add_argument('--task', default='msi_classifier', type=str, choices=['msi_
 args = parser.parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-def set_log(logfileName='./logs/cnn.log', level=logging.INFO):
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-        filename=logfileName,
-        filemode='a'
-    )
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
-
-
 def main(args):
     # create results directory if necessary
     if not os.path.isdir(args.results_dir):
@@ -114,7 +99,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    set_log()
+    set_log('./logs/cnn.log')
 
 
     def seed_torch(seed=7):
