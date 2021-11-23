@@ -1,64 +1,64 @@
 # 1.create_patchs_fp：
-`python create_patchs_fp --source xxx --save_dir xxx --patch_size 256 --step_size 256 --seg --patch --stitch`
+`python create_patchs_fp --source xxx --save_dir xxx --patch_size 256 --step_size 256 --seg --patch --stitch`  
 --source  
 Catalog of whole slide image  
 --save_dir  
 Catalog of generated tissue data  
---patch_size
-Side length of patch
---step_size
-Divide the interval of patch
---seg
-Whether to segmentation the tissue area
---patch
-Whether to generate patch
---stitch
-Whether to generate the stitched map of the patch
-# 2.tumor_detect_from_tissue.py
-`python tumor_detect_from_tissue.py --wsi_dir xxx --tissue_file_dir xxx --save_dir xxx --stitch`
---wsi_dir
-Catalog of whole slide image
---tissue_file_dir
-Catalog of generated tissue data in the previous step
---save_dir
-Catalog of generated tumor data
---stitch
-Whether to generate the stitched map of the patch
-# 3.extract_features_fp.py
-`python extract_features_fp.py --data_h5_dir xxx --data_slide_dir xxx --csv_path xxx --feat_dir xxx --batch_size 512 --slide_ext .svs`
---data_h5_dir
-Catalog of tumor patch coordinates .h5 files
---data_slide_dir
-Catalog of whole slide image
---csv_path
-Catalog of source data attribute genorated in first step
---feat_dir
-Catalog of genorated feature
---batch_size
-Batch size of generated features
---slide_ext
-Whole slide image format
-# 4.main_mtl_concat.py
-`python main_mtl_concat.py --lr 1e-4 --k 10 --k_start 0 --k_end 10 --dataset_csv xxx --exp_code xxx --task msi_classifier --log_data --data_root_dir xxx --model_type toad --early_stopping`
---lr
-Learning rate during training
---k
-K-fold cross validation
---k_start
-The beginning num of K-fold cross-validation
---k_end
-The ending num of K-fold cross-validation
---dataset_csv
-Catalog of source data attribute genorated in first step
---drop_out
-Whether to drop out
---early_stopping
-Whether early stopping
---exp_code
-The code for this task
---log_data
-Whether to generate logs
---data_root_dir
-Catalog of whole slide image
---model_type
-Model type
+--patch_size  
+Side length of patch  
+--step_size  
+Divide the interval of patch  
+--seg  
+Whether to segmentation the tissue area  
+--patch  
+Whether to generate patch  
+--stitch  
+Whether to generate the stitched map of the patch  
+# 2.tumor_detect_from_tissue.py：
+`python tumor_detect_from_tissue.py --wsi_dir xxx --tissue_file_dir xxx --save_dir xxx --stitch`  
+--wsi_dir  
+Catalog of whole slide image  
+--tissue_file_dir  
+Catalog of generated tissue data in the previous step  
+--save_dir  
+Catalog of generated tumor data  
+--stitch  
+Whether to generate the stitched map of the patch  
+# 3.extract_features_fp.py：
+`python extract_features_fp.py --data_h5_dir xxx --data_slide_dir xxx --csv_path xxx --feat_dir xxx --batch_size 512 --slide_ext .svs`  
+--data_h5_dir    
+Catalog of tumor patch coordinates .h5 files  
+--data_slide_dir  
+Catalog of whole slide image  
+--csv_path  
+Catalog of source data attribute genorated in first step  
+--feat_dir  
+Catalog of genorated feature  
+--batch_size  
+Batch size of generated features  
+--slide_ext  
+Whole slide image format  
+# 4.main_mtl_concat.py：
+`python main_mtl_concat.py --lr 1e-4 --k 10 --k_start 0 --k_end 10 --dataset_csv xxx --exp_code xxx --task msi_classifier --log_data --data_root_dir xxx --model_type toad --early_stopping`  
+--lr  
+Learning rate during training  
+--k  
+K-fold cross validation  
+--k_start  
+The beginning num of K-fold cross-validation  
+--k_end  
+The ending num of K-fold cross-validation  
+--dataset_csv  
+Catalog of source data attribute genorated in first step  
+--drop_out  
+Whether to drop out  
+--early_stopping  
+Whether early stopping  
+--exp_code  
+The code for this task  
+--log_data  
+Whether to generate logs  
+--data_root_dir  
+Catalog of whole slide image  
+--model_type  
+Model type  
