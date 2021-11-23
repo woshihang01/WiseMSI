@@ -1,9 +1,9 @@
 # 1.create_patchs_fp：
 `python create_patchs_fp --source xxx --save_dir xxx --patch_size 256 --step_size 256 --seg --patch --stitch`
---source
-Catalog of whole slide image
---save_dir
-Catalog of generated tissue data
+--source  
+Catalog of whole slide image  
+--save_dir  
+Catalog of generated tissue data  
 --patch_size
 Side length of patch
 --step_size
