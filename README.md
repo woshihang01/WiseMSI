@@ -1,6 +1,7 @@
 # 1.create_patchs_fp：
 This script is used to process the case image and divide it into patches. The patch size of the whole slide image scanned by 40x mirror is 512 pixels, and the patch size of the whole slide image scanned by 20x mirror is 256 pixels. The step size is consistent with the patch size.
 
+
 `python create_patchs_fp --source xxx --save_dir xxx --patch_size 256 --step_size 256 --seg --patch --stitch`
 
 * `--source`: Catalog of whole slide image
