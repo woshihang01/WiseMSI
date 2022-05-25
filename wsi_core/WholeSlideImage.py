@@ -114,7 +114,7 @@ class WholeSlideImage(object):
         asset_dict = {'holes': self.holes_tissue, 'tissue': self.contours_tissue}
         save_pkl(mask_file, asset_dict)
 
-    def segmentTissue(self, seg_level=0, sthresh=20, sthresh_up=255, mthresh=7, close=0, use_otsu=False,
+    def segmentTissue(self, seg_level=0, h_sthresh=120, s_sthresh=8, v_sthresh=100,sthresh_up=255, mthresh=7, close=0, use_otsu=False,
                       filter_params={'a_t': 100}, ref_patch_size=512, exclude_ids=[], keep_ids=[]):
         """
             Segment the tissue via HSV -> Median thresholding -> Binary threshold
@@ -169,19 +169,20 @@ class WholeSlideImage(object):
 
         img = np.array(self.wsi.read_region((0, 0), seg_level, self.level_dim[seg_level]))
         img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)  # Convert to HSV space
-        img_med = cv2.medianBlur(img_hsv[:, :, 1], mthresh)  # Apply median blurring
-
+        h_img_med = cv2.medianBlur(img_hsv[:, :, 0], mthresh)  # Apply median blurring
+        s_img_med = cv2.medianBlur(img_hsv[:, :, 1], mthresh)  # Apply median blurring
+        v_img_med = cv2.medianBlur(img_hsv[:, :, 2], mthresh)  # Apply median blurring
         # Thresholding
         if use_otsu:
-            _, img_otsu = cv2.threshold(img_med, 0, sthresh_up, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
+            _, h_img_otsu = cv2.threshold(h_img_med, 0, sthresh_up, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
+            _, s_img_otsu = cv2.threshold(s_img_med, 0, sthresh_up, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
+            _, v_img_otsu = cv2.threshold(v_img_med, 0, sthresh_up, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
         else:
-            _, img_otsu = cv2.threshold(img_med, sthresh, sthresh_up, cv2.THRESH_BINARY)
-        lower_red = np.array([0, 0, 0])
-        upper_red = np.array([180, 255, 85])
-        mask = cv2.inRange(img_hsv, lower_red, upper_red)
-        mask[mask == 255] = 1
-        img_otsu = img_otsu + mask
+            _, h_img_otsu = cv2.threshold(h_img_med, h_sthresh, sthresh_up, cv2.THRESH_BINARY)
+            _, s_img_otsu = cv2.threshold(s_img_med, s_sthresh, sthresh_up, cv2.THRESH_BINARY)
+            _, v_img_otsu = cv2.threshold(v_img_med, v_sthresh, sthresh_up, cv2.THRESH_BINARY)
 
+        img_otsu = h_img_otsu & v_img_otsu & s_img_otsu
         # Morphological closing
         if close > 0:
             kernel = np.ones((close, close), np.uint8)
