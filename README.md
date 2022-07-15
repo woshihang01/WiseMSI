@@ -40,5 +40,22 @@ Generate eigenvector of whole slide image.
 * `--exp_code`: The code for this task
 * `--log_data`: Whether to generate logs
 * `--data_root_dir`: Catalog of whole slide image
-* `--model_type`: Model type
-
+* `--task`: Task name
+* `--split_dir` Split dirctory
+* `--model_type`: Model type can select toad, toad_cosine, rnn, mil, attmil
+# 5.main_cnn_trainer.py：
+`python main_cnn_trainer.py --max_epochs 5 --lr 1e-4 --k 10 --k_start 0 --k_end 10 --dataset_csv dataset_csv/dataset_tcga_stad.csv --exp_code msi_classifier_vit --task msi_classifier --log_data --data_root_dir D:\stad_result_all\feature\h5_files --model_type vit --split_dir msi_classifier_tcga_stad_100 --batch_size 32 --input_size 384`
+* `--lr`: Learning rate during training
+* `--data_root_dir` Whole slide image directory
+* `--k`: K-fold cross validation  
+* `--k_start`: The beginning num of K-fold cross-validation
+* `--k_end`: The ending num of K-fold cross-validation
+* `--dataset_csv`: Catalog of source data attribute genorated in first step
+* `--drop_out`: Whether to drop out
+* `--early_stopping`: Whether early stopping
+* `--exp_code`: The code for this task
+* `--log_data`: Whether to generate logs
+* `--data_root_dir`: Catalog of whole slide image
+* `--task`: Task name
+* `--split_dir` Split dirctory
+* `--model_type`: Model type can select resnet18, resnet50, vit, efficient
