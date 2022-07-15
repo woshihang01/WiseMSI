@@ -44,7 +44,7 @@ Generate eigenvector of whole slide image.
 * `--split_dir` Split dirctory
 * `--model_type`: Model type can select toad, toad_cosine, rnn, mil, attmil
 # 5.main_cnn_trainer.py：
-`python main_cnn_trainer.py --max_epochs 5 --lr 1e-4 --k 10 --k_start 0 --k_end 10 --dataset_csv dataset_csv/dataset_tcga_stad.csv --exp_code msi_classifier_vit --task msi_classifier --log_data --data_root_dir D:\stad_result_all\feature\h5_files --model_type vit --split_dir msi_classifier_tcga_stad_100 --batch_size 32 --input_size 384`
+`python main_cnn_trainer.py --max_epochs 5 --lr 1e-4 --k 10 --k_start 0 --k_end 10 --dataset_csv dataset_csv/xxx.csv --exp_code msi_classifier_vit --task msi_classifier --log_data --data_root_dir xxx/xxx/xxx --model_type vit --split_dir msi_classifier_xxx_100 --batch_size 32 --input_size 384`
 * `--lr`: Learning rate during training
 * `--data_root_dir` Whole slide image directory
 * `--k`: K-fold cross validation  
