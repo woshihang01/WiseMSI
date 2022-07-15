@@ -46,7 +46,7 @@ parser.add_argument('--exp_code', type=str, help='experiment code for saving res
 parser.add_argument('--weighted_sample', action='store_true', default=False, help='enable weighted sampling')
 parser.add_argument('--task', type=str, choices=['msi_classifier'])
 parser.add_argument('--dataset_csv', type=str, help='dataset_csv')
-parser.add_argument('--model_type', default=False, choices=['toad', 'toad_cosine', 'rnn', 'mil', 'attmil'])
+parser.add_argument('--model_type', default=False, choices=['toad', 'toad_cosine', 'rnn', 'mil', 'attmil', 'varmil'])
 
 args = parser.parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,7 +78,7 @@ def main(args):
                                                                          csv_path='{}/splits_{}.csv'.format(
                                                                              args.split_dir, i))
 
-        print(
+        logging.info(
             'training: {}, validation: {}, testing: {}'.format(len(train_dataset), len(val_dataset), len(test_dataset)))
         datasets = (train_dataset, val_dataset, test_dataset)
         results, cls_test_auc, cls_val_auc, cls_test_acc, cls_val_acc = train(datasets, i, args)
@@ -135,10 +135,10 @@ if __name__ == "__main__":
                 'weighted_sample': args.weighted_sample,
                 'opt': args.opt}
 
-    print('\nLoad Dataset')
+    logging.info('\nLoad Dataset')
 
     if args.task == 'msi_classifier':
-        if args.model_type == 'toad' or args.model_type == 'toad_cosine' or args.model_type == 'mil' or args.model_type == 'attmil':
+        if args.model_type == 'toad' or args.model_type == 'toad_cosine' or args.model_type == 'mil' or args.model_type == 'attmil' or args.model_type == 'varmil':
             args.n_classes = 2
             dataset = Generic_MIL_MTL_Dataset(csv_path=args.dataset_csv,
                                               data_dir=args.data_root_dir,
@@ -179,9 +179,9 @@ if __name__ == "__main__":
         print(settings, file=f)
     f.close()
 
-    print("################# Settings ###################")
+    logging.info("################# Settings ###################")
     for key, val in settings.items():
-        print("{}:  {}".format(key, val))
+        logging.info("{}:  {}".format(key, val))
     results = main(args)
     logging.info("finished!")
     logging.info("end script")
