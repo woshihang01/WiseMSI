@@ -2,11 +2,13 @@ import h5py
 import numpy as np
 import os
 import pdb
+
+import openslide
+
 from wsi_core.util_classes import Mosaic_Canvas
 from PIL import Image
 import math
 import cv2
-
 
 def isWhitePatch(patch, satThresh=5):
     patch_hsv = cv2.cvtColor(patch, cv2.COLOR_RGB2HSV)
@@ -59,7 +61,7 @@ def savePatchIter_bag_hdf5(patch):
     file.close()
 
 
-def save_hdf5(output_path, asset_dict, attr_dict= None, mode='a'):
+def save_hdf5(output_path, asset_dict, attr_dict=None, mode='a'):
     file = h5py.File(output_path, mode)
     for key, val in asset_dict.items():
         data_shape = val.shape
@@ -217,7 +219,11 @@ def DrawMap(canvas, patch_dset, coords, patch_size, indices=None, verbose=1, dra
 
 
 def DrawMapFromCoords(canvas, wsi_object, coords, patch_size, vis_level, indices=None, verbose=1, draw_grid=True):
-    downsamples = wsi_object.wsi.level_downsamples[vis_level]
+    if isinstance(wsi_object, openslide.OpenSlide):
+        wsi = wsi_object
+    else:
+        wsi = wsi_object.getOpenSlide()
+    downsamples = wsi.level_downsamples[vis_level]
     if indices is None:
         indices = np.arange(len(coords))
     total = len(indices)
@@ -234,7 +240,7 @@ def DrawMapFromCoords(canvas, wsi_object, coords, patch_size, vis_level, indices
 
         patch_id = indices[idx]
         coord = coords[patch_id]
-        patch = np.array(wsi_object.wsi.read_region(tuple(coord), vis_level, patch_size).convert("RGB"))
+        patch = np.array(wsi.read_region(tuple(coord), vis_level, patch_size).convert("RGB"))
         coord = np.ceil(coord / downsamples).astype(np.int32)
         canvas_crop_shape = canvas[coord[1]:coord[1] + patch_size[1], coord[0]:coord[0] + patch_size[0], :3].shape[:2]
         canvas[coord[1]:coord[1] + patch_size[1], coord[0]:coord[0] + patch_size[0], :3] = patch[:canvas_crop_shape[0],
@@ -279,7 +285,11 @@ def StitchPatches(hdf5_file_path, downscale=16, draw_grid=False, bg_color=(0, 0,
 
 
 def StitchCoords(hdf5_file_path, wsi_object, downscale=16, draw_grid=False, bg_color=(0, 0, 0), alpha=-1):
-    wsi = wsi_object.getOpenSlide()
+    if isinstance(wsi_object, openslide.OpenSlide):
+        wsi = wsi_object
+    else:
+        wsi = wsi_object.getOpenSlide()
+
     vis_level = wsi.get_best_level_for_downsample(downscale)
     file = h5py.File(hdf5_file_path, 'r')
     dset = file['coords']

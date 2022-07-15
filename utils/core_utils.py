@@ -10,6 +10,7 @@ from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.metrics import auc as calc_auc
 import torch.nn.functional as F
 
+
 class Accuracy_Logger(object):
     """Accuracy logger"""
 
@@ -77,7 +78,7 @@ class EarlyStopping:
         elif score < self.best_score:
             self.counter += 1
             logging.info(f'EarlyStopping counter: {self.counter} out of {self.patience}')
-            if self.counter >= self.patience and epoch > self.stop_epoch:
+            if self.counter >= self.patience and epoch >= self.stop_epoch:
                 self.early_stop = True
         else:
             self.best_score = score
@@ -96,7 +97,7 @@ def train(datasets, cur, args):
     """
         train for a single fold
     """
-    logging.info('\nTraining Fold {}!'.format(cur))
+    logging.info('Training Fold {}!'.format(cur))
     writer_dir = os.path.join(args.results_dir, str(cur))
     if not os.path.isdir(writer_dir):
         os.mkdir(writer_dir)
@@ -108,7 +109,7 @@ def train(datasets, cur, args):
     else:
         writer = None
 
-    print('\nInit train/val/test splits...', end=' ')
+    print('Init train/val/test splits...', end=' ')
     train_split, val_split, test_split = datasets
     # save_splits(datasets, ['train', 'val', 'test'], os.path.join(args.results_dir, 'splits_{}.csv'.format(cur)))
     print('Done!')
@@ -117,12 +118,13 @@ def train(datasets, cur, args):
     print("Testing on {} samples".format(len(test_split)), end=' ')
 
     print('\nInit Model...', end=' ')
-    model = build_model(args.n_classes)
+    model = build_model(args.model_type,args.n_classes)
     print('Done!')
     # print_network(model)
 
     print('\nInit optimizer ...', end=' ')
     optimizer = get_optim(model, args)
+    lr_schduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5, last_epoch=-1)
     print('Done!')
     print('\nInit loss function ...', end=' ')
     loss_fn = nn.CrossEntropyLoss()
@@ -136,7 +138,7 @@ def train(datasets, cur, args):
     print('\nSetup EarlyStopping...', end=' ')
     if args.early_stopping:
         # 连续patience轮次损失值不再下降且总轮次超过stop_epoch时就会终止
-        early_stopping = EarlyStopping(patience=3, stop_epoch=5, verbose=True)
+        early_stopping = EarlyStopping(patience=1, stop_epoch=1, verbose=True)
     else:
         early_stopping = None
     print('Done!')
@@ -145,6 +147,7 @@ def train(datasets, cur, args):
         train_loop(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn)
         stop = validate(cur, epoch, model, val_loader, args.n_classes,
                         early_stopping, writer, loss_fn, args.results_dir)
+        lr_schduler.step()
         if stop:
             break
 
@@ -187,7 +190,6 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer=None, loss_fn=
     train_loss = 0.
     train_error = 0.
 
-    logging.info('\n')
     for batch_idx, (data, label) in enumerate(loader):
         data, label = data.to(device), label.to(device)
 
@@ -200,8 +202,9 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer=None, loss_fn=
 
         train_loss += loss_value
         localtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        logging.info('time {}, batch {}, loss: {:.4f}, acc: {:.4f}'.format(localtime, batch_idx, loss_value,
-                                                                           acc_num / data.size(0)))
+        if batch_idx % 100 == 0:
+            logging.info('time {}, batch {}, loss: {:.4f}, acc: {:.4f}'.format(localtime, batch_idx, loss_value,
+                                                                               acc_num / data.size(0)))
 
         error = calculate_error(Y_hat, label)
         train_error += error
@@ -319,7 +322,8 @@ def summary(model, loader, n_classes):
     test_error /= len(loader)
     patch_result = pd.DataFrame(
         {'wsi': wsi_list, 'logit': all_probs[:, 1].tolist(), 'pred': all_preds.tolist(), 'label': all_labels.tolist()})
-    wsi_result = pd.concat([patch_result.groupby('wsi')['logit'].mean(), patch_result.groupby('wsi')['label'].mean()], axis=1)
+    wsi_result = pd.concat([patch_result.groupby('wsi')['logit'].mean(), patch_result.groupby('wsi')['label'].mean()],
+                           axis=1)
     if n_classes == 2:
         auc = roc_auc_score(all_labels, all_probs[:, 1])
         aucs = []

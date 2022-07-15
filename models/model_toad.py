@@ -17,8 +17,9 @@ args:
 
 class Attn_Net_Gated(nn.Module):
 
-    def __init__(self, L=1024, D=256, dropout=False, n_tasks=1):
+    def __init__(self, attention_mechanism='dot',  L=1024, D=256, dropout=False, n_tasks=1):
         super(Attn_Net_Gated, self).__init__()
+        self.attention_mechanism = attention_mechanism
         self.attention_a = [
             nn.Linear(L, D),
             nn.Tanh()]
@@ -37,34 +38,16 @@ class Attn_Net_Gated(nn.Module):
     def forward(self, x):
         a = self.attention_a(x)
         b = self.attention_b(x)
-        A = a.mul(b)
+
+        if self.attention_mechanism == 'dot':
+            A = a.mul(b)
+
+        elif self.attention_mechanism == 'cosine':
+            A = torch.unsqueeze(torch.cosine_similarity(a, b), 1)  # N
+        else:
+            raise Exception('model is error')
         A = self.attention_c(A)  # N x n_classes
         return A, x
-
-
-class Attn_Net_Gated_Cosine(nn.Module):
-
-    def __init__(self, L=1024, D=256, dropout=False, n_tasks=1):
-        super(Attn_Net_Gated_Cosine, self).__init__()
-        self.attention_a = [
-            nn.Linear(L, D),
-            nn.Tanh()]
-
-        self.attention_b = [nn.Linear(L, D),
-                            nn.Sigmoid()]
-        if dropout:
-            self.attention_a.append(nn.Dropout(0.25))
-            self.attention_b.append(nn.Dropout(0.25))
-
-        self.attention_a = nn.Sequential(*self.attention_a)
-        self.attention_b = nn.Sequential(*self.attention_b)
-
-    def forward(self, x):
-        a = self.attention_a(x)  # N*D
-        b = self.attention_b(x)  # N*D
-        A = torch.unsqueeze(torch.cosine_similarity(a, b), 1)  # N
-        return A, x
-
 
 """
 TOAD multi-task + concat mil network w/ attention-based pooling
@@ -81,21 +64,17 @@ class TOAD_fc_mtl_concat(nn.Module):
         super(TOAD_fc_mtl_concat, self).__init__()
         self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
         size = self.size_dict[size_arg]
-        self.model_type = model_type
+
         fc = [nn.Linear(size[0], size[1]), nn.ReLU()]
         if dropout:
             fc.append(nn.Dropout(0.25))
         fc.extend([nn.Linear(size[1], size[1]), nn.ReLU()])
         if dropout:
             fc.append(nn.Dropout(0.25))
-        if self.model_type == 'toad_cosine':
-            attention_net = Attn_Net_Gated_Cosine(L=size[1], D=size[1], dropout=dropout, n_tasks=1)
-            self.classifier = nn.Linear(size[1], n_classes)
-        elif self.model_type == 'toad':
-            attention_net = Attn_Net_Gated(L=size[1], D=size[2], dropout=dropout, n_tasks=1)
-            self.classifier = nn.Linear(size[1], n_classes)
-        else:
-            raise Exception('args错误！！！')
+
+        attention_net = Attn_Net_Gated(attention_mechanism='dot' if model_type=='toad' else 'cosine', L=size[1], D=size[2], dropout=dropout, n_tasks=1)
+        self.classifier = nn.Linear(size[1], n_classes)
+
         fc.append(attention_net)
         self.attention_net = nn.Sequential(*fc)
 

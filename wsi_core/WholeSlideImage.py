@@ -19,6 +19,8 @@ from wsi_core.util_classes import isInContourV1, isInContourV2, isInContourV3_Ea
 from utils.file_utils import load_pkl, save_pkl
 from utils.utils import apply_stain_norm, get_stain_normalizer
 from tqdm import tqdm
+from skimage.color import rgb2hsv
+from skimage.filters import threshold_otsu
 
 Image.MAX_IMAGE_PIXELS = 933120000
 
@@ -48,20 +50,20 @@ class WholeSlideImage(object):
         self.contours_tissue = None
         self.contours_tumor = None
         self.hdf5_file = None
-        self.normalizer = get_stain_normalizer()
+        # self.normalizer = get_stain_normalizer()
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        print('Loading tumor detect model...', end=' ')
-        self.tumor_detect_model = build_model(2)
-        self.tumor_detect_model.load_state_dict(torch.load('models/epoch_0_s_0_checkpoint.pt'))
-        self.tumor_detect_model = self.tumor_detect_model.to(self.device)
-        print('Done')
-
-        print('Loading extract feature model...', end=' ')
-        self.extract_feature_model = resnet50_baseline(pretrained=True)
-        self.extract_feature_model = self.extract_feature_model.to(self.device)
-        print('Done')
+        # print('Loading tumor detect model...', end=' ')
+        # self.tumor_detect_model = build_model(2)
+        # self.tumor_detect_model.load_state_dict(torch.load('models/epoch_0_s_0_checkpoint.pt'))
+        # self.tumor_detect_model = self.tumor_detect_model.to(self.device)
+        # print('Done')
+        #
+        # print('Loading extract feature model...', end=' ')
+        # self.extract_feature_model = resnet50_baseline(pretrained=True)
+        # self.extract_feature_model = self.extract_feature_model.to(self.device)
+        # print('Done')
 
     def getOpenSlide(self):
         return self.wsi
@@ -114,8 +116,8 @@ class WholeSlideImage(object):
         asset_dict = {'holes': self.holes_tissue, 'tissue': self.contours_tissue}
         save_pkl(mask_file, asset_dict)
 
-    def segmentTissue(self, seg_level=0, h_sthresh=120, s_sthresh=8, v_sthresh=100,sthresh_up=255, mthresh=7, close=0, use_otsu=False,
-                      filter_params={'a_t': 100}, ref_patch_size=512, exclude_ids=[], keep_ids=[]):
+    def segmentTissue(self, seg_level=0, h_sthresh=120, s_sthresh=8, v_sthresh=120, sthresh_up=255, mthresh=7, close=0, use_otsu=False,
+                      filter_params={'a_t': 100}, ref_patch_size=512, exclude_ids=[], keep_ids=[], RGB_min=50):
         """
             Segment the tissue via HSV -> Median thresholding -> Binary threshold
         """
@@ -172,6 +174,7 @@ class WholeSlideImage(object):
         h_img_med = cv2.medianBlur(img_hsv[:, :, 0], mthresh)  # Apply median blurring
         s_img_med = cv2.medianBlur(img_hsv[:, :, 1], mthresh)  # Apply median blurring
         v_img_med = cv2.medianBlur(img_hsv[:, :, 2], mthresh)  # Apply median blurring
+
         # Thresholding
         if use_otsu:
             _, h_img_otsu = cv2.threshold(h_img_med, 0, sthresh_up, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
@@ -181,7 +184,6 @@ class WholeSlideImage(object):
             _, h_img_otsu = cv2.threshold(h_img_med, h_sthresh, sthresh_up, cv2.THRESH_BINARY)
             _, s_img_otsu = cv2.threshold(s_img_med, s_sthresh, sthresh_up, cv2.THRESH_BINARY)
             _, v_img_otsu = cv2.threshold(v_img_med, v_sthresh, sthresh_up, cv2.THRESH_BINARY)
-
         img_otsu = h_img_otsu & v_img_otsu & s_img_otsu
         # Morphological closing
         if close > 0:
@@ -441,10 +443,10 @@ class WholeSlideImage(object):
                     # 执行筛选出tumor区域
                     if only_tumor:
                         # 参数model, batch_size=1024, ratio=0.5
-                        self._tumor_filter_save_hdf5(asset_dict, patch_level, patch_size, normalize, save_path_hdf5,
+                        self._tumor_filter_save_hdf5(asset_dict, patch_level, patch_size, normalize, save_path_hdf5, attr_dict,
                                                      mode='a')
                     else:
-                        save_hdf5(save_path_hdf5, asset_dict, mode='a')
+                        save_hdf5(save_path_hdf5, asset_dict, attr_dict, mode='a')
 
         return self.hdf5_file
 
@@ -547,8 +549,8 @@ class WholeSlideImage(object):
         coord_candidates = np.array([x_coords.flatten(), y_coords.flatten()]).transpose()
 
         num_workers = mp.cpu_count()
-        if num_workers > 10:
-            num_workers = 10
+        if num_workers > 3:
+            num_workers = 3
         pool = mp.Pool(num_workers)
 
         iterable = [(coord, contour_holes, ref_patch_size[0], cont_check_fn) for coord in coord_candidates]

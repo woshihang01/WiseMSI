@@ -25,7 +25,7 @@ parser.add_argument('--data_root_dir', type=str, help='h5file directory')
 parser.add_argument('--max_epochs', type=int, default=300,
                     help='maximum number of epochs to train (default: 200)')
 parser.add_argument('--lr', type=float, default=5e-5,
-                    help='learning rate (default: 0.0001)')
+                    help='learning rate (default: 0.00005)')
 parser.add_argument('--reg', type=float, default=1e-5,
                     help='weight decay (default: 1e-5)')
 parser.add_argument('--seed', type=int, default=1,
@@ -46,7 +46,8 @@ parser.add_argument('--exp_code', type=str, help='experiment code for saving res
 parser.add_argument('--weighted_sample', action='store_true', default=False, help='enable weighted sampling')
 parser.add_argument('--task', type=str, choices=['msi_classifier'])
 parser.add_argument('--dataset_csv', type=str, help='dataset_csv')
-parser.add_argument('--model_type', default=False, choices=['toad', 'toad_cosine', 'rnn'])
+parser.add_argument('--model_type', default=False, choices=['toad', 'toad_cosine', 'rnn', 'mil', 'attmil'])
+
 args = parser.parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -120,7 +121,6 @@ if __name__ == "__main__":
 
     seed_torch(args.seed)
 
-    encoding_size = 1024
     settings = {'num_splits': args.k,
                 'k_start': args.k_start,
                 'k_end': args.k_end,
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     print('\nLoad Dataset')
 
     if args.task == 'msi_classifier':
-        if args.model_type == 'toad' or args.model_type == 'toad_cosine':
+        if args.model_type == 'toad' or args.model_type == 'toad_cosine' or args.model_type == 'mil' or args.model_type == 'attmil':
             args.n_classes = 2
             dataset = Generic_MIL_MTL_Dataset(csv_path=args.dataset_csv,
                                               data_dir=args.data_root_dir,

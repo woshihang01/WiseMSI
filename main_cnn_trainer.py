@@ -20,14 +20,16 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 import logging
+import warnings
+warnings.filterwarnings("ignore")
+
 
 # Training settings
 parser = argparse.ArgumentParser(description='Configurations for WSI Training')
-parser.add_argument('--csv_file_path', type=str, help='dataset csv path')
-parser.add_argument('--h5_file_path', type=str, help='coords h5file path')
+parser.add_argument('--data_root_dir', type=str, help='h5file directory')
 parser.add_argument('--max_epochs', type=int, default=100,
                     help='maximum number of epochs to train (default: 200)')
-parser.add_argument('--lr', type=float, default=5e-5,
+parser.add_argument('--lr', type=float, default=1e-4,
                     help='learning rate (default: 0.0001)')
 parser.add_argument('--reg', type=float, default=1e-5,
                     help='weight decay (default: 1e-5)')
@@ -36,7 +38,6 @@ parser.add_argument('--seed', type=int, default=1,
 parser.add_argument('--k', type=int, default=10, help='number of folds (default: 10)')
 parser.add_argument('--k_start', type=int, default=-1, help='start fold (default: -1, last fold)')
 parser.add_argument('--k_end', type=int, default=-1, help='end fold (default: -1, first fold)')
-parser.add_argument('--batch_size', type=int, default=128, help='number of batch_size')
 parser.add_argument('--results_dir', default='./results', help='results directory (default: ./results)')
 parser.add_argument('--split_dir', type=str, default=None,
                     help='manually specify the set of splits to use, '
@@ -48,10 +49,14 @@ parser.add_argument('--opt', type=str, choices=['adam', 'sgd'], default='adam')
 parser.add_argument('--drop_out', action='store_true', default=True, help='enabel dropout (p=0.25)')
 parser.add_argument('--exp_code', type=str, help='experiment code for saving results')
 parser.add_argument('--weighted_sample', action='store_true', default=False, help='enable weighted sampling')
-parser.add_argument('--task', default='msi_classifier', type=str, choices=['msi_classifier'])
-
+parser.add_argument('--task', type=str, choices=['msi_classifier'])
+parser.add_argument('--dataset_csv', type=str, help='dataset csv path')
+parser.add_argument('--model_type', choices=['resnet18', 'vit', 'efficient', 'resnet50'])
+parser.add_argument('--batch_size', type=int, default=128, help='number of batch_size')
+parser.add_argument('--input_size', type=int, choices=[224, 384])
 args = parser.parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def main(args):
     # create results directory if necessary
@@ -76,7 +81,7 @@ def main(args):
     for i in folds:
         seed_torch(args.seed)
         train_dataset, val_dataset, test_dataset = dataset.return_splits(csv_path='{}/splits_{}.csv'.format(
-            args.split_dir, i), max_nums=(50, 50, 100))
+            args.split_dir, i), max_nums=(75, 75, 75))
 
         print(
             'training: {}, validation: {}, testing: {}'.format(len(train_dataset), len(val_dataset), len(test_dataset)))
@@ -116,7 +121,7 @@ if __name__ == "__main__":
 
 
     seed_torch(args.seed)
-    encoding_size = 1024
+
     settings = {'num_splits': args.k,
                 'k_start': args.k_start,
                 'k_end': args.k_end,
@@ -135,9 +140,8 @@ if __name__ == "__main__":
 
     if args.task == 'msi_classifier':
         args.n_classes = 2
-        dataset = Whole_Slide_Patches_Gen(args.csv_file_path,
-                                          args.h5_file_path,
-                                          True,
+        dataset = Whole_Slide_Patches_Gen(args.dataset_csv, args.data_root_dir, training=True,
+                                          input_size=args.input_size,
                                           label_dicts=[{"MSS": 0, "MSI-H": 1}, {}, {}],
                                           patch_level=0,
                                           patch_size=512,

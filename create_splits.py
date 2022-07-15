@@ -15,7 +15,7 @@ parser.add_argument('--k', type=int, default=10,
 parser.add_argument('--hold_out_test', action='store_true', default=False,
                     help='fraction to hold out (default: 0)')
 parser.add_argument('--split_code', type=str, default=None)
-parser.add_argument('--task', type=str, default='msi_classifier', choices=['msi_classifier', 'tumor_classifier'])
+parser.add_argument('--task', type=str, default='msi_classifier', choices=['msi_classifier', 'tumor_classifier', 'tumor_classifier_luad'])
 parser.add_argument('--dataset_csv', type=str, help='dataset_csv')
 
 args = parser.parse_args()
@@ -39,7 +39,15 @@ elif args.task == 'tumor_classifier':
                                       label_dicts=[{0: 0}],
                                       label_cols=['label'],
                                       patient_strat=False)
-
+elif args.task == 'tumor_classifier_luad':
+    args.n_classes = 1
+    dataset = Generic_WSI_MTL_Dataset(csv_path=args.dataset_csv,
+                                      shuffle=False,
+                                      seed=args.seed,
+                                      print_info=True,
+                                      label_dicts=[{0: 0}],
+                                      label_cols=['label'],
+                                      patient_strat=False)
 else:
     raise NotImplementedError
 

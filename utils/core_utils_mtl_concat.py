@@ -7,6 +7,8 @@ import os
 from datasets.dataset_mtl_concat import save_splits
 from sklearn.metrics import roc_auc_score
 from models.model_toad import TOAD_fc_mtl_concat
+from models.model_mil import MIL_fc
+from models.model_attmil import GatedAttention
 from models.model_rnn import rnn_classify
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.metrics import auc as calc_auc
@@ -127,12 +129,23 @@ def train(datasets, cur, args):
     loss_fn = nn.CrossEntropyLoss().to(device)
 
     print('\nInit Model...', end=' ')
-    model_dict = {"dropout": args.drop_out, 'n_classes': args.n_classes, 'model_type': args.model_type}
-    if model_dict['model_type'] == 'toad' or model_dict['model_type'] == 'toad_cosine':
+
+    if args.model_type == 'toad' or args.model_type == 'toad_cosine':
+        model_dict = {"dropout": args.drop_out, 'n_classes': args.n_classes, 'model_type': args.model_type}
         model = TOAD_fc_mtl_concat(**model_dict)
         model.relocate()
         print('Done!')
-    elif model_dict['model_type'] == 'rnn':
+    elif args.model_type == 'mil':
+        model_dict = {"dropout": args.drop_out, 'n_classes': args.n_classes}
+        model = MIL_fc(**model_dict)
+        model.relocate()
+        print('Done!')
+    elif args.model_type == 'attmil':
+        model_dict = {"dropout": args.drop_out, 'n_classes': args.n_classes}
+        model = GatedAttention(**model_dict)
+        model.relocate()
+        print('Done!')
+    elif args.model_type == 'rnn':
         model = rnn_classify().to(device)
         print('Done!')
     else:
@@ -144,11 +157,11 @@ def train(datasets, cur, args):
     print('Done!')
 
     print('\nInit Loaders...', end=' ')
-    if model_dict['model_type'] == 'toad' or model_dict['model_type'] == 'toad_cosine':
+    if args.model_type == 'toad' or args.model_type == 'toad_cosine' or args.model_type == 'mil' or args.model_type == 'attmil':
         train_loader = get_split_loader(train_split, training=True, testing=args.testing, weighted=args.weighted_sample)
         val_loader = get_split_loader(val_split)
         test_loader = get_split_loader(test_split)
-    elif model_dict['model_type'] == 'rnn':
+    elif args.model_type == 'rnn':
         train_loader = DataLoader(train_split, 64, shuffle=True)
         val_loader = DataLoader(val_split, 64, shuffle=False)
         test_loader = DataLoader(test_split, 64, shuffle=False)
@@ -157,12 +170,12 @@ def train(datasets, cur, args):
     print('Done!')
     print('\nSetup EarlyStopping...', end=' ')
     if args.early_stopping:
-        early_stopping = EarlyStopping(patience=40, stop_epoch=100, verbose=True)  # 连续patience轮，并且总论此超过stop_epoch轮就会终止
+        early_stopping = EarlyStopping(patience=3, stop_epoch=15, verbose=True)  # 连续patience轮，并且总论此超过stop_epoch轮就会终止
 
     else:
         early_stopping = None
     print('Done!')
-    if model_dict['model_type'] == 'toad' or model_dict['model_type'] == 'toad_cosine':
+    if args.model_type == 'toad' or args.model_type == 'toad_cosine' or args.model_type == 'mil' or args.model_type == 'attmil':
         for epoch in range(args.max_epochs):
             train_loop(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn)
             stop = validate(cur, epoch, model, val_loader, args.n_classes,
@@ -180,7 +193,7 @@ def train(datasets, cur, args):
 
         results_dict, cls_test_error, cls_test_auc, acc_loggers = summary(model, test_loader, args.n_classes)
         logging.info('Cls Test error: {:.4f}, Cls ROC AUC: {:.4f}'.format(cls_test_error, cls_test_auc))
-    elif model_dict['model_type'] == 'rnn':
+    elif args.model_type == 'rnn':
         for epoch in range(args.max_epochs):
             train_loop_rnn(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn)
             stop = validate_rnn(cur, epoch, model, val_loader, args.n_classes,
@@ -485,8 +498,7 @@ def summary(model, loader, n_classes):
         with torch.no_grad():
             results_dict = model(data)
 
-        logits, Y_prob, Y_hat, A = results_dict['logits'], results_dict['Y_prob'], results_dict['Y_hat'], results_dict[
-            'A']
+        logits, Y_prob, Y_hat = results_dict['logits'], results_dict['Y_prob'], results_dict['Y_hat']
 
         cls_logger.log(Y_hat, label)
         cls_probs = Y_prob.cpu().numpy()
@@ -494,7 +506,7 @@ def summary(model, loader, n_classes):
         all_cls_labels[batch_idx] = label.item()
 
         patient_results.update(
-            {slide_id: {'slide_id': np.array(slide_id), 'cls_prob': cls_probs, 'cls_label': label.item(), 'A': A}})
+            {slide_id: {'slide_id': np.array(slide_id), 'cls_prob': cls_probs, 'cls_label': label.item()}})
         cls_error = calculate_error(Y_hat, label)
         cls_test_error += cls_error
 

@@ -244,6 +244,7 @@ if __name__ == '__main__':
                         help='name of list of images to process with parameters (.csv)')
     parser.add_argument('--only_tumor', default=False, action='store_true')
     parser.add_argument('--normalize', default=False, action='store_true')
+    parser.add_argument('--slide_type', choices=['luad', 'coad'])
     args = parser.parse_args()
 
     patch_save_dir = os.path.join(args.save_dir, 'patches')
@@ -272,9 +273,9 @@ if __name__ == '__main__':
         if key not in ['source']:
             os.makedirs(val, exist_ok=True)
 
-    seg_params = {'seg_level': -1, 'sthresh': 15, 'mthresh': 1, 'close': 4, 'use_otsu': False,
+    seg_params = {'seg_level': -1, 'h_sthresh': 120, 'v_sthresh': 80, 'mthresh': 15, 'close': 4, 'use_otsu': False,
                   'keep_ids': 'none', 'exclude_ids': 'none'}
-    filter_params = {'a_t': 2, 'a_h': 10, 'max_n_holes': 10}
+    filter_params = {'a_t': 100, 'a_h': 16, 'max_n_holes': 10}
     vis_params = {'vis_level': -1, 'line_thickness': 150}
     patch_params = {'use_padding': True, 'contour_fn': 'four_pt'}
 

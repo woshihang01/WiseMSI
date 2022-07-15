@@ -28,7 +28,7 @@ def get_stain_normalizer(path='stainColorNormalization/template.png', method='ma
     return normalizer
 
 
-normalizer = get_stain_normalizer()
+# normalizer = get_stain_normalizer()
 
 
 def apply_stain_norm(tile, normalizer):
@@ -39,12 +39,11 @@ def apply_stain_norm(tile, normalizer):
     return transformed
 
 
-def patches_gen_transforms(training=False):
+def patches_gen_transforms(input_size, training=False):
     if training:
         trnsfrms_val = transforms.Compose(
             [
-                transforms.Resize(256),
-                transforms.RandomCrop(224),
+                transforms.RandomCrop(input_size),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -54,7 +53,7 @@ def patches_gen_transforms(training=False):
     else:
         trnsfrms_val = transforms.Compose(
             [
-                transforms.Resize(224),
+                transforms.Resize(input_size),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -221,11 +220,13 @@ class Whole_Slide_Patches_Gen(Dataset):
     def __init__(self, csv_file_path,
                  h5_file_path,
                  training,
+                 input_size,
                  label_dicts=[{}, {}, {}],
                  patch_level=0,
                  patch_size=512,
                  ):
         slide_data = pd.read_csv(csv_file_path)
+        self.input_size = input_size
         self.label_dicts = label_dicts
         self.num_classes = [len(set(label_dict.values())) for label_dict in self.label_dicts]
         self.patch_level = patch_level
@@ -237,7 +238,7 @@ class Whole_Slide_Patches_Gen(Dataset):
         self.paths = slide_data['path'].tolist()
         self.h5_file_path = h5_file_path
         self.training = training
-        self.roi_transforms = patches_gen_transforms(self.training)
+        self.roi_transforms = patches_gen_transforms(self.input_size, self.training)
         self.wsi_list = []
         self.data_list = []
         for slide_id, case_id, path in tqdm.tqdm(zip(self.slides, self.cases, self.paths)):
@@ -274,10 +275,10 @@ class Whole_Slide_Patches_Gen(Dataset):
             with openslide.OpenSlide(self.data_list[idx][5]) as slide:
                 img = slide.read_region((self.data_list[idx][1], self.data_list[idx][2]), self.patch_level,
                                         (self.patch_size, self.patch_size)).convert('RGB')
-                img = apply_stain_norm(img, normalizer)
+                # img = apply_stain_norm(img, normalizer)
                 img = self.roi_transforms(img)
         except Exception as e:
-            print(self.data_list[idx][5])
+            print(self.data_list[idx][5],e)
         return img, self.data_list[idx][3]
 
     def return_splits(self, csv_path, max_nums):
@@ -290,11 +291,11 @@ class Whole_Slide_Patches_Gen(Dataset):
         train_df = dataframe[dataframe[4].isin(train_patient)]
         val_df = dataframe[dataframe[4].isin(val_patient)]
         test_df = dataframe[dataframe[4].isin(test_patient)]
-        train_split = Whole_Slide_Patches_Split(train_df, max_nums[0], self.training, self.patch_level,
+        train_split = Whole_Slide_Patches_Split(train_df, max_nums[0], self.training, self.input_size, self.patch_level,
                                                 self.patch_size)
-        val_split = Whole_Slide_Patches_Split(val_df, max_nums[1], False, self.patch_level,
+        val_split = Whole_Slide_Patches_Split(val_df, max_nums[1], False, self.input_size, self.patch_level,
                                               self.patch_size)
-        test_split = Whole_Slide_Patches_Split(test_df, max_nums[2], False, self.patch_level,
+        test_split = Whole_Slide_Patches_Split(test_df, max_nums[2], False, self.input_size, self.patch_level,
                                                self.patch_size)
 
         return train_split, val_split, test_split
@@ -304,6 +305,7 @@ class Whole_Slide_Patches_Split(Whole_Slide_Patches_Gen):
     def __init__(self, df,
                  max_num,
                  training,
+                 input_size,
                  patch_level=0,
                  patch_size=512
                  ):
@@ -317,20 +319,32 @@ class Whole_Slide_Patches_Split(Whole_Slide_Patches_Gen):
         self.patch_level = patch_level
         self.patch_size = patch_size
         self.training = training
-        self.roi_transforms = patches_gen_transforms(self.training)
+        self.roi_transforms = patches_gen_transforms(input_size, self.training)
 
     def __len__(self):
         return self.length
 
 
 if __name__ == '__main__':
-    dataset = Whole_Slide_Patches_Gen(r'C:\Code\WiseMSI\dataset_csv\dataset_train_test2_test3_msi_95tumor.csv',
-                                      r'C:\RESULTS_TUMOR_STAIN_NORM_95\patches',
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from torch import nn
+    dataset = Whole_Slide_Patches_Gen('../dataset_test.csv',
+                                      r'C:\RESULTS_TUMOR_STAIN_NORM_50\patches',
                                       training=True,
+                                      input_size=384,
                                       label_dicts=[{'MSS': 0, 'MSI-H': 1}],
                                       )
-    train_dataset, val_dataset, test_dataset = dataset.return_splits(
-        r'C:\Code\WiseMSI\splits\msi_classifier_100\splits_0.csv', [100, 100, float('INF')])
+    train_dataset, val_dataset, test_dataset = dataset.return_splits('../splits_test.csv', [100, 100, 100])
     dl = DataLoader(train_dataset, batch_size=33, shuffle=True)
-    for x, y in dl:
-        print('emmm')
+
+    from pytorch_pretrained_vit import ViT
+
+    model = ViT('B_32_imagenet1k', pretrained=True)
+    fc_in_features = model.fc.in_features
+    model.fc = nn.Linear(fc_in_features, 2)
+    model = model.to(device)
+    for data, label in dl:
+        data, label = data.to(device), label.to(device)
+        logits = model(data)
+        print(logits)
+

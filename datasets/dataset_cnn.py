@@ -7,6 +7,8 @@ import PIL.Image as Image
 import torch
 import numpy as np
 from torchvision import transforms
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class WSI_Patches_Image(Dataset):

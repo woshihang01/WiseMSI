@@ -130,20 +130,17 @@ if __name__ == '__main__':
     parser.add_argument('--n_classes', default=2)
     parser.add_argument('--results_dir', default='./results', help='results directory (default: ./results)')
     parser.add_argument('--drop_out', action='store_true', default=True, help='enabel dropout (p=0.25)')
-    parser.add_argument('--model_type', default='toad', choices=['toad', 'toad_cosine', 'rnn'])
-    parser.add_argument('--pt_files_dir', default='D:/RESULTS_TUMOR_STAIN_NORM_95/patches', type=str,
-                        help='h5file directory')
-    parser.add_argument('--patches_dir', default='D:/RESULTS_TUMOR_STAIN_NORM_95/patches', type=str,
-                        help='patches directory')
+    parser.add_argument('--model_type', choices=['toad', 'toad_cosine', 'rnn'])
+    parser.add_argument('--patches_dir', type=str, help='patches directory')
     parser.add_argument('--task', type=str, choices=['msi_classifier'], default='msi_classifier')
     parser.add_argument('--seed', type=int, default=1,
                         help='random seed for reproducible experiment (default: 1)')
-    parser.add_argument('--k', type=int, default=10)
-    parser.add_argument('--exp_code', type=str, help='experiment code for saving results',
-                        default='msi_classifier_2021_09_09_toad_95tumor')
+    parser.add_argument('--k', type=int)
+    parser.add_argument('--exp_code', type=str, help='experiment code for saving results')
+    parser.add_argument('--csv_path', type=str,)
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    csv_path = 'dataset_csv/dataset_train_test2_test3_msi_95tumor.csv'
+    csv_path = args.csv_path
     logging.info("csv_path is {}".format(csv_path))
     model_path = os.path.join(args.results_dir, args.exp_code + "_s1", "s_{}_checkpoint.pt".format(args.k))
     loss_fn = nn.CrossEntropyLoss()
@@ -155,7 +152,7 @@ if __name__ == '__main__':
         model.relocate()
         print('Done!')
         dataset = Generic_MIL_MTL_Dataset(csv_path=csv_path,
-                                          data_dir=args.pt_files_dir,
+                                          data_dir=args.patches_dir,
                                           shuffle=False,
                                           seed=args.seed,
                                           print_info=True,
@@ -167,7 +164,7 @@ if __name__ == '__main__':
                                                                                                args.exp_code + "_s1",
                                                                                                'splits_{}.csv'.format(
                                                                                                    args.k)))
-        test_loader = get_split_loader(dataset)
+        test_loader = get_split_loader(test_dataset)
 
         logging.info("model load_state {}".format(model_path))
         model.load_state_dict(torch.load(model_path))
@@ -177,7 +174,7 @@ if __name__ == '__main__':
         model = rnn_classify().to(device)
         print('Done!')
         dataset = Generic_WSI_RNN_Dataset(csv_path=csv_path,
-                                          data_dir=args.pt_files_dir, n=100,
+                                          data_dir=args.patches_dir, n=100,
                                           print_info=True,
                                           label_dicts=[{'MSS': 0, 'MSI-H': 1}],
                                           label_cols=['label'])

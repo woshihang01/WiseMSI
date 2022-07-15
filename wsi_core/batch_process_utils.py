@@ -32,13 +32,14 @@ def initialize_df(slides, seg_params, filter_params, vis_params, patch_params,
 		'status': np.full((total), 'tbp'),
 		# seg params
 		'seg_level': np.full((total), int(seg_params['seg_level']), dtype=np.int8),
-		'sthresh': np.full((total), int(seg_params['sthresh']), dtype=np.uint8),
+		'h_sthresh': np.full((total), int(seg_params['h_sthresh']), dtype=np.uint8),
+		'v_sthresh': np.full((total), int(seg_params['v_sthresh']), dtype=np.uint8),
 		'mthresh': np.full((total), int(seg_params['mthresh']), dtype=np.uint8),
 		'close': np.full((total), int(seg_params['close']), dtype=np.uint32),
 		'use_otsu': np.full((total), bool(seg_params['use_otsu']), dtype=bool),
 		'keep_ids': np.full((total), seg_params['keep_ids']),
 		'exclude_ids': np.full((total), seg_params['exclude_ids']),
-		
+
 		# filter params
 		'a_t': np.full((total), int(filter_params['a_t']), dtype=np.float32),
 		'a_h': np.full((total), int(filter_params['a_h']), dtype=np.float32),
